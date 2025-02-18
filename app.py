@@ -49,40 +49,22 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
             
             table = page.extract_table()
             if table:
-                total_rows_detected += len(table)
-                previous_row = None
-                
                 for row in table:
                     if len(row) >= 4 and row[0] and row[0].isdigit():
-                        if previous_row and row[0] == "":
-                            previous_row[2] += " " + " ".join(row[2].split("\n")).strip()
-                            continue
+                        total_rows_detected += 1
                         
                         cleaned_lines = [line for line in row[2].split("\n") if not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
                         nama_barang = " ".join(cleaned_lines).strip()
                         
-                        harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
-                        if harga_qty_info:
-                            harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
-                            qty = int(float(harga_qty_info.group(2).replace('.', '').replace(',', '.')))
-                            unit = harga_qty_info.group(3)
-                        else:
-                            harga, qty, unit = 0, 0, "Unknown"
-                        
-                        total = harga * qty
-                        dpp = total / 1.11
-                        ppn = total - dpp
-                        
-                        item = [
-                            no_fp if no_fp else "Tidak ditemukan", 
-                            nama_penjual if nama_penjual else "Tidak ditemukan", 
-                            nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                            nama_barang, harga, unit, qty, total, dpp, ppn, 
-                            tanggal_faktur  
-                        ]
-                        data.append(item)
-                        total_rows_extracted += 1
-                        previous_row = item
+                        if nama_barang:
+                            data.append([
+                                no_fp if no_fp else "Tidak ditemukan", 
+                                nama_penjual if nama_penjual else "Tidak ditemukan", 
+                                nama_pembeli if nama_pembeli else "Tidak ditemukan", 
+                                nama_barang,
+                                tanggal_faktur  
+                            ])
+                            total_rows_extracted += 1
     
     if total_rows_detected != total_rows_extracted:
         st.warning(f"Perbedaan jumlah data: Ditemukan {total_rows_detected} baris, tetapi hanya {total_rows_extracted} berhasil diekstrak.")
@@ -103,7 +85,7 @@ if __name__ == "__main__":
                     all_data.extend(extracted_data)
             
             if all_data:
-                df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "DPP", "PPN", "Tanggal Faktur"])
+                df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Tanggal Faktur"])
                 df.index = df.index + 1  
                 
                 st.write("### Pratinjau Data yang Diekstrak")
