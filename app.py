@@ -72,7 +72,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                         if previous_row and previous_row[3]:
                             data.append(previous_row)  # Simpan baris sebelumnya jika ada
                         
-                        cleaned_lines = [line for line in row[2].split("\n") if not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
+                        cleaned_lines = [line for line in row[2].split("\n") if line and not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
                         nama_barang = " ".join(cleaned_lines).strip()
                         
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
@@ -94,7 +94,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                             nama_barang, harga, unit, qty, total, dpp, ppn, 
                             tanggal_faktur  
                         ]
-                    elif previous_row:  # Jika baris adalah lanjutan dari baris sebelumnya
+                    elif previous_row and row[2]:  # Jika baris adalah lanjutan dari baris sebelumnya
                         previous_row[3] += " " + row[2].strip()
                 
                 if previous_row:
