@@ -100,7 +100,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                     elif previous_row and row[2]:  # Jika baris adalah lanjutan dari baris sebelumnya
                         previous_row[3] += " " + row[2].strip()
                 
-                if previous_row and previous_row[3] not in unique_items:
+                if previous_row and previous_row[3] and previous_row[3] not in unique_items:
                     data.append(previous_row)
                     unique_items.add(previous_row[3])  # Tambahkan barang terakhir
     
