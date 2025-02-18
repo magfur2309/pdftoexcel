@@ -48,6 +48,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
     previous_row = None
+    unique_items = set()  # Untuk mencegah duplikasi barang
     
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
@@ -70,7 +71,9 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                 for row in table:
                     if row[0] and row[0].isdigit():  # Jika baris baru dimulai
                         if previous_row and previous_row[3]:
-                            data.append(previous_row)  # Simpan baris sebelumnya jika ada
+                            if previous_row[3] not in unique_items:
+                                data.append(previous_row)
+                                unique_items.add(previous_row[3])  # Simpan barang unik
                         
                         cleaned_lines = [line for line in row[2].split("\n") if line and not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
                         nama_barang = " ".join(cleaned_lines).strip()
@@ -97,8 +100,9 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                     elif previous_row and row[2]:  # Jika baris adalah lanjutan dari baris sebelumnya
                         previous_row[3] += " " + row[2].strip()
                 
-                if previous_row:
-                    data.append(previous_row)  # Simpan item terakhir di halaman
+                if previous_row and previous_row[3] not in unique_items:
+                    data.append(previous_row)
+                    unique_items.add(previous_row[3])  # Tambahkan barang terakhir
     
     # Validasi jumlah baris yang diekstrak
     extracted_count = len(data)
