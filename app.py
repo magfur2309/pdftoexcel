@@ -4,45 +4,16 @@ import pdfplumber
 import io
 import re
 
-def login_page():
-    if st.session_state.get("logged_in"):
-        return True
-    
-    st.title("Login Convert PDF FP To Excel")
-    username = st.text_input("Username", key="username")
-    password = st.text_input("Password", type="password", key="password")
-    login_btn = st.button("Login")
-    
-    if (username and password) and (login_btn or st.session_state.get("attempt_login")):
-        if (username == "admin" and password == "admin") or (username == "demo" and password == "123456"):
-            st.session_state["logged_in"] = True
-            st.session_state["user"] = username
-            st.rerun()
-        else:
-            st.error("Username atau password salah!")
-            st.session_state["attempt_login"] = False
-    
-    return False
-
-def extract_tanggal_faktur(pdf):
-    month_mapping = {
-        "Januari": "01", "Februari": "02", "Maret": "03", "April": "04",
-        "Mei": "05", "Juni": "06", "Juli": "07", "Agustus": "08",
-        "September": "09", "Oktober": "10", "November": "11", "Desember": "12"
-    }
-    tanggal_faktur = "Tidak ditemukan"
-    
-    with pdfplumber.open(pdf) as pdf_obj:
-        for page in pdf_obj.pages:
+def count_items_in_pdf(pdf_file):
+    """Menghitung jumlah item dalam PDF berdasarkan pola nomor urut."""
+    item_count = 0
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
             text = page.extract_text()
             if text:
-                date_match = re.search(r'(\d{1,2})\s*(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s*(\d{4})', text, re.IGNORECASE)
-                if date_match:
-                    day, month, year = date_match.groups()
-                    tanggal_faktur = f"{year}-{month_mapping[month]}-{day.zfill(2)}"
-                    break  
-    
-    return tanggal_faktur
+                matches = re.findall(r'^(\d{1,3})\s+000000', text, re.MULTILINE)
+                item_count += len(matches)
+    return item_count
 
 def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
@@ -66,16 +37,9 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
             
             table = page.extract_table()
             if table:
-                previous_row = None
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
-                        if previous_row and row[0] == "":
-                            previous_row[2] += " " + " ".join(row[2].split("\n")).strip()
-                            continue
-                        
-                        cleaned_lines = [line for line in row[2].split("\n") if not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
-                        nama_barang = " ".join(cleaned_lines).strip()
-                        
+                        nama_barang = " ".join(row[2].split("\n")).strip()
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
                         if harga_qty_info:
                             harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
@@ -96,7 +60,6 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                             tanggal_faktur  
                         ]
                         data.append(item)
-                        previous_row = item
     return data
 
 def main_app():
@@ -106,8 +69,14 @@ def main_app():
     if uploaded_files:
         all_data = []
         for uploaded_file in uploaded_files:
-            tanggal_faktur = extract_tanggal_faktur(uploaded_file)  
+            tanggal_faktur = "2025-01-09"  # Placeholder untuk tanggal faktur
             extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur)
+            detected_item_count = count_items_in_pdf(uploaded_file)
+            extracted_item_count = len(extracted_data)
+            
+            if detected_item_count != extracted_item_count:
+                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
+            
             if extracted_data:
                 all_data.extend(extracted_data)
         
@@ -128,5 +97,4 @@ def main_app():
             st.error("Gagal mengekstrak data. Pastikan format faktur sesuai.")
 
 if __name__ == "__main__":
-    if login_page():
-        main_app()
+    main_app()
