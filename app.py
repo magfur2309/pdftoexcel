@@ -8,10 +8,40 @@ def login_page():
     if st.session_state.get("logged_in"):
         return True
     
-    st.title("Login Convert PDF FP To Excel")
+    st.markdown(
+        """
+        <style>
+            .login-container {
+                max-width: 400px;
+                margin: auto;
+                padding: 2rem;
+                background: #121212;
+                color: white;
+                text-align: center;
+                border-radius: 10px;
+            }
+            input {
+                margin-bottom: 10px;
+            }
+            .login-btn {
+                background-color: #007BFF;
+                color: white;
+                width: 100%;
+                padding: 10px;
+                border: none;
+                border-radius: 5px;
+            }
+        </style>
+        <div class='login-container'>
+            <h2>Login Convert PDF FP To Excel</h2>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
     username = st.text_input("Username", key="username")
     password = st.text_input("Password", type="password", key="password")
-    login_btn = st.button("Login")
+    login_btn = st.button("Login", key="login", help="Masuk ke sistem")
     
     if (username and password) and (login_btn or st.session_state.get("attempt_login")):
         if (username == "admin" and password == "admin") or (username == "demo" and password == "123456"):
