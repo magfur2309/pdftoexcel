@@ -68,11 +68,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
             if table:
                 previous_row = None
                 for row in table:
-                    if len(row) >= 4 and row[0].isdigit():
-                        if previous_row and row[0] == "":
-                            previous_row[2] += " " + " ".join(row[2].split("\n")).strip()
-                            continue
-                        
+                    if row[0] and row[0].isdigit():
                         cleaned_lines = [line for line in row[2].split("\n") if not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
                         nama_barang = " ".join(cleaned_lines).strip()
                         
@@ -89,14 +85,20 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                         ppn = total - dpp
                         
                         item = [
-                            no_fp if no_fp else "Tidak ditemukan", 
-                            nama_penjual if nama_penjual else "Tidak ditemukan", 
-                            nama_pembeli if nama_pembeli else "Tidak ditemukan", 
+                            no_fp or "Tidak ditemukan", 
+                            nama_penjual or "Tidak ditemukan", 
+                            nama_pembeli or "Tidak ditemukan", 
                             nama_barang, harga, unit, qty, total, dpp, ppn, 
                             tanggal_faktur  
                         ]
                         data.append(item)
                         previous_row = item
+    
+    # Validasi jumlah baris yang diekstrak
+    extracted_count = len(data)
+    if extracted_count < 1:
+        st.warning("Tidak ada item yang berhasil diekstrak. Periksa format PDF.")
+    
     return data
 
 def main_app():
