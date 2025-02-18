@@ -47,23 +47,33 @@ def extract_tanggal_faktur(pdf):
 def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
-    previous_row = None
-    unique_items = set()
-    total_rows = 0  # Menyimpan jumlah total baris terbaca
-    
+
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                no_fp_match = re.search(r'Kode dan Nomor Seri Faktur Pajak:\s*(\d+)', text)
+                if no_fp_match:
+                    no_fp = no_fp_match.group(1)
+                
+                penjual_match = re.search(r'Nama\s*:\s*([\w\s\-.,&]+)\nAlamat', text)
+                if penjual_match:
+                    nama_penjual = penjual_match.group(1).strip()
+                
+                pembeli_match = re.search(r'Pembeli Barang Kena Pajak/Penerima Jasa Kena Pajak:\s*Nama\s*:\s*([\w\s\-.,&]+)\nAlamat', text)
+                if pembeli_match:
+                    nama_pembeli = pembeli_match.group(1).strip()
+            
             table = page.extract_table()
             if table:
+                previous_row = None
                 for row in table:
-                    total_rows += 1  # Menambah jumlah total baris yang ditemukan
-                    if row[0] and row[0].isdigit():
-                        if previous_row and previous_row[3]:
-                            if previous_row[3] not in unique_items:
-                                data.append(previous_row)
-                                unique_items.add(previous_row[3])
+                    if len(row) >= 4 and row[0].isdigit():
+                        if previous_row and row[0] == "":
+                            previous_row[2] += " " + " ".join(row[2].split("\n")).strip()
+                            continue
                         
-                        cleaned_lines = [line for line in row[2].split("\n") if line and not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
+                        cleaned_lines = [line for line in row[2].split("\n") if not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
                         nama_barang = " ".join(cleaned_lines).strip()
                         
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
@@ -78,21 +88,15 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                         dpp = total / 1.11
                         ppn = total - dpp
                         
-                        previous_row = [
-                            no_fp or "Tidak ditemukan", 
-                            nama_penjual or "Tidak ditemukan", 
-                            nama_pembeli or "Tidak ditemukan", 
+                        item = [
+                            no_fp if no_fp else "Tidak ditemukan", 
+                            nama_penjual if nama_penjual else "Tidak ditemukan", 
+                            nama_pembeli if nama_pembeli else "Tidak ditemukan", 
                             nama_barang, harga, unit, qty, total, dpp, ppn, 
                             tanggal_faktur  
                         ]
-                    elif previous_row and row[2]:
-                        previous_row[3] += " " + row[2].strip()
-                
-                if previous_row and previous_row[3] and previous_row[3] not in unique_items:
-                    data.append(previous_row)
-                    unique_items.add(previous_row[3])
-    
-    st.write(f"Jumlah total baris terbaca: {total_rows}")  # Menampilkan jumlah total baris terbaca
+                        data.append(item)
+                        previous_row = item
     return data
 
 def main_app():
