@@ -15,11 +15,13 @@ def count_items_in_pdf(pdf_file):
                 item_count += len(matches)
     return item_count
 
-def extract_data_from_pdf(pdf_file, tanggal_faktur):
+def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
-
+    item_counter = 0
+    
     with pdfplumber.open(pdf_file) as pdf:
+        previous_row = None
         for page in pdf.pages:
             text = page.extract_text()
             if text:
@@ -39,6 +41,10 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
             if table:
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
+                        if previous_row and row[0] == "":
+                            previous_row[3] += " " + " ".join(row[2].split("\n")).strip()
+                            continue
+                        
                         nama_barang = " ".join(row[2].split("\n")).strip()
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
                         if harga_qty_info:
@@ -60,6 +66,11 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                             tanggal_faktur  
                         ]
                         data.append(item)
+                        previous_row = item
+                        item_counter += 1
+                        
+                        if item_counter >= expected_item_count:
+                            break  
     return data
 
 def main_app():
@@ -70,8 +81,8 @@ def main_app():
         all_data = []
         for uploaded_file in uploaded_files:
             tanggal_faktur = "2025-01-09"  # Placeholder untuk tanggal faktur
-            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur)
             detected_item_count = count_items_in_pdf(uploaded_file)
+            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
             extracted_item_count = len(extracted_data)
             
             if detected_item_count != extracted_item_count:
