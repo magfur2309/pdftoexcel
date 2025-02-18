@@ -68,13 +68,13 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
             if table:
                 previous_row = None
                 for row in table:
-                    if len(row) >= 4 and row[0].isdigit():
+                    if len(row) >= 4 and row[0] and row[0].isdigit():
                         if previous_row and row[0] == "":
                             previous_row[3] += " " + row[2].strip()
                             continue
                         
                         nama_barang = row[2].strip()
-                        harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
+                        harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[3])
                         if harga_qty_info:
                             harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
                             qty = int(float(harga_qty_info.group(2).replace('.', '').replace(',', '.')))
