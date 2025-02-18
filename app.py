@@ -66,16 +66,9 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
             
             table = page.extract_table()
             if table:
-                previous_row = None
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
-                        if previous_row and row[0] == "":
-                            previous_row[2] += " " + " ".join(row[2].split("\n")).strip()
-                            continue
-                        
-                        cleaned_lines = [line for line in row[2].split("\n") if not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
-                        nama_barang = " ".join(cleaned_lines).strip()
-                        
+                        nama_barang = row[2].strip()
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
                         if harga_qty_info:
                             harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
@@ -85,7 +78,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                             harga, qty, unit = 0, 0, "Unknown"
                         
                         total = harga * qty
-                        potongan_harga = 0  # Placeholder for discount extraction
+                        potongan_harga = 0  
                         dpp = (total - potongan_harga) / 1.11
                         ppn = total - dpp
                         
@@ -97,7 +90,6 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                             tanggal_faktur  
                         ]
                         data.append(item)
-                        previous_row = item
     return data
 
 def main_app():
