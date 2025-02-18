@@ -4,54 +4,72 @@ import pdfplumber
 import io
 import re
 
-def login_page():
-    if st.session_state.get("logged_in"):
-        return True
+def extract_data_from_pdf(pdf_file, tanggal_faktur):
+    data = []
+    total_rows_detected = 0  # Counter untuk jumlah baris yang ditemukan di PDF
+    total_rows_extracted = 0  # Counter untuk jumlah baris yang berhasil diekstrak
     
-    st.title("Login Convert PDF FP To Excel")
-    username = st.text_input("Username", key="username")
-    password = st.text_input("Password", type="password", key="password")
-    login_btn = st.button("Login")
-    
-    if (username and password) and (login_btn or st.session_state.get("attempt_login")):
-        if (username == "admin" and password == "admin") or (username == "demo" and password == "123456"):
-            st.session_state["logged_in"] = True
-            st.session_state["user"] = username
-            st.rerun()
-        else:
-            st.error("Username atau password salah!")
-            st.session_state["attempt_login"] = False
-    
-    return False
-
-def extract_tanggal_faktur(pdf_file):
-    month_mapping = {
-        "Januari": "01", "Februari": "02", "Maret": "03", "April": "04",
-        "Mei": "05", "Juni": "06", "Juli": "07", "Agustus": "08",
-        "September": "09", "Oktober": "10", "November": "11", "Desember": "12"
-    }
-    tanggal_faktur = "Tidak ditemukan"
+    no_fp, nama_penjual, nama_pembeli = None, None, None
     
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
             text = page.extract_text()
             if text:
-                date_match = re.search(r'(\d{1,2})\s*(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s*(\d{4})', text, re.IGNORECASE)
-                if date_match:
-                    day, month, year = date_match.groups()
-                    tanggal_faktur = f"{year}-{month_mapping[month]}-{day.zfill(2)}"
-                    break  
-    
-    return tanggal_faktur
-
-def hitung_baris_pdf(pdf_file):
-    total_baris = 0
-    with pdfplumber.open(pdf_file) as pdf:
-        for page in pdf.pages:
+                no_fp_match = re.search(r'Kode dan Nomor Seri Faktur Pajak:\s*(\d+)', text)
+                if no_fp_match:
+                    no_fp = no_fp_match.group(1)
+                
+                penjual_match = re.search(r'Nama\s*:\s*([\w\s\-.,&]+)\nAlamat', text)
+                if penjual_match:
+                    nama_penjual = penjual_match.group(1).strip()
+                
+                pembeli_match = re.search(r'Pembeli Barang Kena Pajak/Penerima Jasa Kena Pajak:\s*Nama\s*:\s*([\w\s\-.,&]+)\nAlamat', text)
+                if pembeli_match:
+                    nama_pembeli = pembeli_match.group(1).strip()
+            
             table = page.extract_table()
             if table:
-                total_baris += sum(1 for row in table if row[0] and row[0].isdigit())
-    return total_baris
+                total_rows_detected += len(table)  # Hitung jumlah baris yang ditemukan dalam tabel
+                previous_row = None
+                
+                for row in table:
+                    if len(row) >= 4 and row[0].isdigit():
+                        if previous_row and row[0] == "":
+                            previous_row[2] += " " + " ".join(row[2].split("\n")).strip()
+                            continue
+                        
+                        cleaned_lines = [line for line in row[2].split("\n") if not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
+                        nama_barang = " ".join(cleaned_lines).strip()
+                        
+                        harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
+                        if harga_qty_info:
+                            harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
+                            qty = int(float(harga_qty_info.group(2).replace('.', '').replace(',', '.')))
+                            unit = harga_qty_info.group(3)
+                        else:
+                            harga, qty, unit = 0, 0, "Unknown"
+                        
+                        total = harga * qty
+                        dpp = total / 1.11
+                        ppn = total - dpp
+                        
+                        item = [
+                            no_fp if no_fp else "Tidak ditemukan", 
+                            nama_penjual if nama_penjual else "Tidak ditemukan", 
+                            nama_pembeli if nama_pembeli else "Tidak ditemukan", 
+                            nama_barang, harga, unit, qty, total, dpp, ppn, 
+                            tanggal_faktur  
+                        ]
+                        data.append(item)
+                        total_rows_extracted += 1
+                        previous_row = item
+    
+    # Jika terdapat perbedaan antara jumlah baris yang ditemukan di PDF dengan yang diekstrak
+    if total_rows_detected != total_rows_extracted:
+        st.warning(f"Perbedaan jumlah data: Ditemukan {total_rows_detected} baris, tetapi hanya {total_rows_extracted} berhasil diekstrak.")
+    
+    return data
+
 
 def main_app():
     st.title("Konversi Faktur Pajak PDF ke Excel")
@@ -59,15 +77,9 @@ def main_app():
     
     if uploaded_files:
         all_data = []
-        total_baris_pdf = 0
-        total_baris_output = 0
-
         for uploaded_file in uploaded_files:
-            total_baris_pdf += hitung_baris_pdf(uploaded_file)
             tanggal_faktur = extract_tanggal_faktur(uploaded_file)  
             extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur)
-            total_baris_output += len(extracted_data)
-            
             if extracted_data:
                 all_data.extend(extracted_data)
         
@@ -77,9 +89,6 @@ def main_app():
             
             st.write("### Pratinjau Data yang Diekstrak")
             st.dataframe(df)
-            
-            if total_baris_pdf != total_baris_output:
-                st.warning(f"⚠️ Jumlah baris dalam PDF ({total_baris_pdf}) tidak sesuai dengan hasil ekstraksi ({total_baris_output}). Periksa apakah ada data yang terlewat atau salah dibaca.")
             
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
