@@ -47,7 +47,8 @@ def extract_tanggal_faktur(pdf):
 def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
-
+    previous_row = None
+    
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
             text = page.extract_text()
@@ -66,9 +67,11 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
             
             table = page.extract_table()
             if table:
-                previous_row = None
                 for row in table:
-                    if row[0] and row[0].isdigit():
+                    if row[0] and row[0].isdigit():  # Jika baris baru dimulai
+                        if previous_row and previous_row[3]:
+                            data.append(previous_row)  # Simpan baris sebelumnya jika ada
+                        
                         cleaned_lines = [line for line in row[2].split("\n") if not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
                         nama_barang = " ".join(cleaned_lines).strip()
                         
@@ -84,15 +87,18 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                         dpp = total / 1.11
                         ppn = total - dpp
                         
-                        item = [
+                        previous_row = [
                             no_fp or "Tidak ditemukan", 
                             nama_penjual or "Tidak ditemukan", 
                             nama_pembeli or "Tidak ditemukan", 
                             nama_barang, harga, unit, qty, total, dpp, ppn, 
                             tanggal_faktur  
                         ]
-                        data.append(item)
-                        previous_row = item
+                    elif previous_row:  # Jika baris adalah lanjutan dari baris sebelumnya
+                        previous_row[3] += " " + row[2].strip()
+                
+                if previous_row:
+                    data.append(previous_row)  # Simpan item terakhir di halaman
     
     # Validasi jumlah baris yang diekstrak
     extracted_count = len(data)
