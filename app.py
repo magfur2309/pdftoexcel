@@ -24,13 +24,33 @@ def login_page():
     
     return False
 
+def extract_tanggal_faktur(pdf_file):
+    month_mapping = {
+        "Januari": "01", "Februari": "02", "Maret": "03", "April": "04",
+        "Mei": "05", "Juni": "06", "Juli": "07", "Agustus": "08",
+        "September": "09", "Oktober": "10", "November": "11", "Desember": "12"
+    }
+    tanggal_faktur = "Tidak ditemukan"
+    
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                date_match = re.search(r'(\d{1,2})\s*(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s*(\d{4})', text, re.IGNORECASE)
+                if date_match:
+                    day, month, year = date_match.groups()
+                    tanggal_faktur = f"{year}-{month_mapping[month]}-{day.zfill(2)}"
+                    break  
+    
+    return tanggal_faktur
+
 def hitung_baris_pdf(pdf_file):
     total_baris = 0
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
             table = page.extract_table()
             if table:
-                total_baris += sum(1 for row in table if row[0].isdigit())
+                total_baris += sum(1 for row in table if row[0] and row[0].isdigit())
     return total_baris
 
 def main_app():
