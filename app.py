@@ -48,32 +48,20 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
     previous_row = None
-    unique_items = set()  # Untuk mencegah duplikasi barang
+    unique_items = set()
+    total_rows = 0  # Menyimpan jumlah total baris terbaca
     
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                no_fp_match = re.search(r'Kode dan Nomor Seri Faktur Pajak:\s*(\d+)', text)
-                if no_fp_match:
-                    no_fp = no_fp_match.group(1)
-                
-                penjual_match = re.search(r'Nama\s*:\s*([\w\s\-.,&]+)\nAlamat', text)
-                if penjual_match:
-                    nama_penjual = penjual_match.group(1).strip()
-                
-                pembeli_match = re.search(r'Pembeli Barang Kena Pajak/Penerima Jasa Kena Pajak:\s*Nama\s*:\s*([\w\s\-.,&]+)\nAlamat', text)
-                if pembeli_match:
-                    nama_pembeli = pembeli_match.group(1).strip()
-            
             table = page.extract_table()
             if table:
                 for row in table:
-                    if row[0] and row[0].isdigit():  # Jika baris baru dimulai
+                    total_rows += 1  # Menambah jumlah total baris yang ditemukan
+                    if row[0] and row[0].isdigit():
                         if previous_row and previous_row[3]:
                             if previous_row[3] not in unique_items:
                                 data.append(previous_row)
-                                unique_items.add(previous_row[3])  # Simpan barang unik
+                                unique_items.add(previous_row[3])
                         
                         cleaned_lines = [line for line in row[2].split("\n") if line and not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
                         nama_barang = " ".join(cleaned_lines).strip()
@@ -97,18 +85,14 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                             nama_barang, harga, unit, qty, total, dpp, ppn, 
                             tanggal_faktur  
                         ]
-                    elif previous_row and row[2]:  # Jika baris adalah lanjutan dari baris sebelumnya
+                    elif previous_row and row[2]:
                         previous_row[3] += " " + row[2].strip()
                 
                 if previous_row and previous_row[3] and previous_row[3] not in unique_items:
                     data.append(previous_row)
-                    unique_items.add(previous_row[3])  # Tambahkan barang terakhir
+                    unique_items.add(previous_row[3])
     
-    # Validasi jumlah baris yang diekstrak
-    extracted_count = len(data)
-    if extracted_count < 1:
-        st.warning("Tidak ada item yang berhasil diekstrak. Periksa format PDF.")
-    
+    st.write(f"Jumlah total baris terbaca: {total_rows}")  # Menampilkan jumlah total baris terbaca
     return data
 
 def main_app():
