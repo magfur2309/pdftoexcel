@@ -85,14 +85,15 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                             harga, qty, unit = 0, 0, "Unknown"
                         
                         total = harga * qty
-                        dpp = total / 1.11
+                        potongan_harga = 0  # Placeholder for discount extraction
+                        dpp = (total - potongan_harga) / 1.11
                         ppn = total - dpp
                         
                         item = [
                             no_fp if no_fp else "Tidak ditemukan", 
                             nama_penjual if nama_penjual else "Tidak ditemukan", 
                             nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                            nama_barang, harga, unit, qty, total, dpp, ppn, 
+                            nama_barang, harga, unit, qty, total, potongan_harga, dpp, ppn, 
                             tanggal_faktur  
                         ]
                         data.append(item)
@@ -112,7 +113,7 @@ def main_app():
                 all_data.extend(extracted_data)
         
         if all_data:
-            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "DPP", "PPN", "Tanggal Faktur"])
+            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "Potongan Harga", "DPP", "PPN", "Tanggal Faktur"])
             df.index = df.index + 1  
             
             st.write("### Pratinjau Data yang Diekstrak")
