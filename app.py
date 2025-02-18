@@ -26,8 +26,8 @@ def login_page():
 
 def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
-    total_rows_detected = 0
-    total_rows_extracted = 0
+    total_nama_barang_detected = 0
+    total_nama_barang_extracted = 0
     
     no_fp, nama_penjual, nama_pembeli = None, None, None
     
@@ -51,10 +51,9 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
             if table:
                 for row in table:
                     if len(row) >= 4 and row[0] and row[0].isdigit():
-                        total_rows_detected += 1
+                        total_nama_barang_detected += 1
                         
-                        cleaned_lines = [line for line in row[2].split("\n") if not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
-                        nama_barang = " ".join(cleaned_lines).strip()
+                        nama_barang = row[2].strip() if row[2] else ""
                         
                         if nama_barang:
                             data.append([
@@ -64,10 +63,10 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                                 nama_barang,
                                 tanggal_faktur  
                             ])
-                            total_rows_extracted += 1
+                            total_nama_barang_extracted += 1
     
-    if total_rows_detected != total_rows_extracted:
-        st.warning(f"Perbedaan jumlah data: Ditemukan {total_rows_detected} baris, tetapi hanya {total_rows_extracted} berhasil diekstrak.")
+    if total_nama_barang_detected != total_nama_barang_extracted:
+        st.warning(f"Perbedaan jumlah data: Ditemukan {total_nama_barang_detected} baris nama barang, tetapi hanya {total_nama_barang_extracted} berhasil diekstrak.")
     
     return data
 
