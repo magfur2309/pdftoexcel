@@ -81,8 +81,8 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                         total = harga * qty
                         potongan_harga = min(potongan_harga, total)
                         
-                        dpp = round((total - potongan_harga) / 1.11, 2) if total > 0 else 0
-                        ppn = round((total - potongan_harga) - dpp, 2) if total > 0 else 0
+                        dpp = total - potongan_harga
+                        ppn = round(dpp * 0.11, 2)
                         
                         item = [no_fp if no_fp else "Tidak ditemukan", nama_penjual if nama_penjual else "Tidak ditemukan", nama_pembeli if nama_pembeli else "Tidak ditemukan", tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
                         data.append(item)
@@ -92,6 +92,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                         if item_counter >= expected_item_count:
                             break  
     return data
+
 
 
 def main_app():
