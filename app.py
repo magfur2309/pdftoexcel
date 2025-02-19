@@ -47,6 +47,7 @@ def extract_tanggal_faktur(pdf):
 def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
+    total_items_found = 0
 
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
@@ -66,6 +67,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
             
             table = page.extract_table()
             if table:
+                total_items_found += len(table) - 1
                 previous_row = None
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
@@ -77,11 +79,17 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                         nama_barang = " ".join(cleaned_lines).strip()
                         
                         try:
-                            harga = int(float(row[3].replace('.', '').replace(',', '.'))) if row[3] and re.search(r'\d', row[3]) else 0
+                            harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
+                            if harga_qty_info:
+                                harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
+                                qty = int(float(harga_qty_info.group(2).replace('.', '').replace(',', '.')))
+                                unit = harga_qty_info.group(3)
+                            else:
+                                harga, qty, unit = 0, 0, "Unknown"
                         except ValueError:
-                            harga = 0  
+                            harga, qty, unit = 0, 0, "Unknown"
                         
-                        total = harga 
+                        total = harga * qty
                         dpp = total / 1.11
                         ppn = total - dpp
                         
@@ -89,11 +97,15 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                             no_fp if no_fp else "Tidak ditemukan", 
                             nama_penjual if nama_penjual else "Tidak ditemukan", 
                             nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                            nama_barang, harga, "Unit", 1, total, dpp, ppn, 
+                            nama_barang, harga, unit, qty, total, dpp, ppn, 
                             tanggal_faktur  
                         ]
                         data.append(item)
                         previous_row = item
+    
+    if total_items_found > 0 and total_items_found != len(data):
+        st.warning(f"Jumlah item tidak cocok untuk {pdf_file.name}: Ditemukan {total_items_found}, diekstrak {len(data)}")
+    
     return data
 
 def main_app():
