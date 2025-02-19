@@ -1,56 +1,37 @@
-# main.py
 import streamlit as st
-import pandas as pd
-import pdfplumber
-import io
-import re
-from login import login_page
+import hashlib
 
-def main_app():
-    if "logged_in" not in st.session_state:
-        st.session_state["logged_in"] = False
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def check_login():
+    st.title("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    login_button = st.button("Login")
     
-    if not st.session_state["logged_in"]:
-        login_page()
-        return
+    user_data = {
+        "admin": hash_password("password123"),
+        "user": hash_password("userpass")
+    }
     
-    st.title("Konversi Faktur Pajak PDF ke Excel")
-    
-    if st.button("Logout"):
-        st.session_state["logged_in"] = False
-        st.experimental_rerun()
-    
-    uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
-    
-    if uploaded_files:
-        all_data = []
-        for uploaded_file in uploaded_files:
-            tanggal_faktur = find_invoice_date(uploaded_file)
-            detected_item_count = count_items_in_pdf(uploaded_file)
-            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
-            extracted_item_count = len(extracted_data)
-            
-            if detected_item_count != extracted_item_count and detected_item_count != 0:
-                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
-            
-            if extracted_data:
-                all_data.extend(extracted_data)
-        
-        if all_data:
-            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "Potongan Harga", "DPP", "PPN", "Tanggal Faktur"])
-            df.index = df.index + 1  
-            
-            st.write("### Pratinjau Data yang Diekstrak")
-            st.dataframe(df)
-            
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
-            output.seek(0)
-            
-            st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    if login_button:
+        if username in user_data and user_data[username] == hash_password(password):
+            st.session_state["authenticated"] = True
+            st.success("Login berhasil! Akses diberikan.")
+            st.experimental_rerun()
         else:
-            st.error("Gagal mengekstrak data. Pastikan format faktur sesuai.")
+            st.error("Username atau password salah")
+
+def main():
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+    
+    if not st.session_state["authenticated"]:
+        check_login()
+    else:
+        st.success("Anda sudah login. Silakan buka aplikasi utama.")
+        st.write("[Buka Aplikasi Utama](app.py)")
 
 if __name__ == "__main__":
-    main_app()
+    main()
