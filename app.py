@@ -45,11 +45,12 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                 if no_fp_match:
                     no_fp = no_fp_match.group(1)
                 
-                penjual_match = re.search(r'Nama\s*:\s*([\w\s\-.,&]+)\nAlamat', text)
+                # Perbaikan regex untuk menangkap nama dengan karakter tambahan seperti ()
+                penjual_match = re.search(r'Nama\s*:\s*([\w\s\-.,&()]+)\n?', text)
                 if penjual_match:
                     nama_penjual = penjual_match.group(1).strip()
                 
-                pembeli_match = re.search(r'Pembeli Barang Kena Pajak/Penerima Jasa Kena Pajak:\s*Nama\s*:\s*([\w\s\-.,&]+)\nAlamat', text)
+                pembeli_match = re.search(r'Pembeli Barang Kena Pajak/Penerima Jasa Kena Pajak:\s*Nama\s*:\s*([\w\s\-.,&()]+)\n?', text)
                 if pembeli_match:
                     nama_pembeli = pembeli_match.group(1).strip()
             
