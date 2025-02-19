@@ -15,16 +15,32 @@ def count_items_in_pdf(pdf_file):
                 item_count += len(matches)
     return item_count
 
-def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
+def extract_tanggal_faktur(text):
+    """Mengekstrak tanggal faktur dari teks PDF."""
+    # Pola untuk mencari tanggal dalam format DD/MM/YYYY atau YYYY-MM-DD
+    tanggal_patterns = [
+        r'Tanggal\s*:\s*(\d{2}/\d{2}/\d{4})',  # Format DD/MM/YYYY
+        r'Tanggal\s*:\s*(\d{4}-\d{2}-\d{2})',  # Format YYYY-MM-DD
+    ]
+    
+    for pattern in tanggal_patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1)
+    return None
+
+def extract_data_from_pdf(pdf_file, expected_item_count):
     data = []
-    no_fp, nama_penjual, nama_pembeli = None, None, None
-    item_counter = 0
+    no_fp, nama_penjual, nama_pembeli, tanggal_faktur = None, None, None, None
     
     with pdfplumber.open(pdf_file) as pdf:
         previous_row = None
         for page in pdf.pages:
             text = page.extract_text()
             if text:
+                if not tanggal_faktur:
+                    tanggal_faktur = extract_tanggal_faktur(text)
+                
                 no_fp_match = re.search(r'Kode dan Nomor Seri Faktur Pajak:\s*(\d+)', text)
                 if no_fp_match:
                     no_fp = no_fp_match.group(1)
@@ -63,7 +79,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                             nama_penjual if nama_penjual else "Tidak ditemukan", 
                             nama_pembeli if nama_pembeli else "Tidak ditemukan", 
                             nama_barang, harga, unit, qty, total, dpp, ppn, 
-                            tanggal_faktur  
+                            tanggal_faktur if tanggal_faktur else "Tidak ditemukan"
                         ]
                         data.append(item)
                         previous_row = item
@@ -80,9 +96,8 @@ def main_app():
     if uploaded_files:
         all_data = []
         for uploaded_file in uploaded_files:
-            tanggal_faktur = "2025-01-09"  # Placeholder untuk tanggal faktur
             detected_item_count = count_items_in_pdf(uploaded_file)
-            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
+            extracted_data = extract_data_from_pdf(uploaded_file, detected_item_count)
             extracted_item_count = len(extracted_data)
             
             # Tampilkan peringatan hanya jika jumlah item tidak cocok dan ditemukan item > 0
