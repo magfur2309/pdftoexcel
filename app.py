@@ -7,59 +7,16 @@ import re
 def login_page():
     st.set_page_config(page_title="Login", page_icon="🔐")
     
-    st.markdown(
-        """
-        <style>
-            .login-container {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 80vh;
-            }
-            .login-input {
-                width: 300px;
-                padding: 10px;
-                margin: 5px;
-                border-radius: 5px;
-                border: 1px solid #ccc;
-            }
-            .login-button {
-                width: 320px;
-                padding: 10px;
-                background-color: #007bff;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
-                font-size: 16px;
-            }
-            .login-button:hover {
-                background-color: #0056b3;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.title("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
     
-    st.markdown("<div class='login-container'>", unsafe_allow_html=True)
-    st.header("Login Form")
-    username = st.text_input("Username :", key="username")
-    password = st.text_input("Password :", type="password", key="password")
-    
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        if st.button("Don't have an account?"):
-            st.warning("Redirect to signup page (Not implemented)")
-    with col2:
-        if st.button("Login"):
-            if username == "admin" and password == "password":  # Example credentials
-                st.success("Login successful!")
-                main_app()
-            else:
-                st.error("Invalid username or password")
-    
-    st.markdown("</div>", unsafe_allow_html=True)
+    if st.button("Login"):
+        if (username == "admin" and password == "admin") or (username == "demo" and password == "123456"):
+            st.success("Login successful!")
+            main_app()
+        else:
+            st.error("Invalid username or password")
 
 def find_invoice_date(pdf_file):
     """Mencari tanggal faktur dalam PDF, mulai dari halaman pertama."""
