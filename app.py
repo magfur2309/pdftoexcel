@@ -25,7 +25,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
         for page in pdf.pages:
             text = page.extract_text()
             if text:
-                no_fp_match = re.search(r'Kode dan Nomor Seri Faktur Pajak:\s*(\d+)', text)
+                no_fp_match = re.search(r'Kode dan Nomor Seri Faktur Pajak:\s*([\d.-]+)', text)
                 if no_fp_match:
                     no_fp = no_fp_match.group(1)
                 
@@ -77,10 +77,11 @@ def main_app():
     st.title("Konversi Faktur Pajak PDF ke Excel")
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
     
+    tanggal_faktur = st.date_input("Pilih tanggal faktur", value=pd.to_datetime("today")).strftime("%Y-%m-%d")
+    
     if uploaded_files:
         all_data = []
         for uploaded_file in uploaded_files:
-            tanggal_faktur = "2025-01-09"  # Placeholder untuk tanggal faktur
             detected_item_count = count_items_in_pdf(uploaded_file)
             extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
             extracted_item_count = len(extracted_data)
@@ -101,6 +102,9 @@ def main_app():
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
+                worksheet = writer.sheets['Faktur Pajak']
+                for col_num, value in enumerate(df.columns.values):
+                    worksheet.set_column(col_num + 1, col_num + 1, len(value) + 5)
             output.seek(0)
             
             st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
