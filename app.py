@@ -4,6 +4,22 @@ import pdfplumber
 import io
 import re
 
+def extract_tanggal_faktur(text):
+    """Mengekstrak tanggal faktur dari teks PDF."""
+    tanggal_match = re.search(r'Tanggal\s*:\s*(\d{2}-\d{2}-\d{4})', text)
+    return tanggal_match.group(1) if tanggal_match else None
+
+def get_tanggal_faktur_from_pdf(pdf_file):
+    """Mencari tanggal faktur dari semua halaman PDF."""
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                tanggal_faktur = extract_tanggal_faktur(text)
+                if tanggal_faktur:
+                    return tanggal_faktur
+    return None
+
 def count_items_in_pdf(pdf_file):
     """Menghitung jumlah item dalam PDF berdasarkan pola nomor urut."""
     item_count = 0
@@ -14,13 +30,6 @@ def count_items_in_pdf(pdf_file):
                 matches = re.findall(r'^(\d{1,3})\s+000000', text, re.MULTILINE)
                 item_count += len(matches)
     return item_count
-
-def extract_tanggal_faktur(text):
-    """Mengekstrak tanggal faktur dari teks PDF."""
-    tanggal_match = re.search(r'Tanggal\s*:\s*(\d{2}-\d{2}-\d{4})', text)
-    if tanggal_match:
-        return tanggal_match.group(1)
-    return None
 
 def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
     data = []
@@ -53,10 +62,8 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                             continue
                         
                         nama_barang = " ".join(row[2].split("\n")).strip()
-                        # Hapus informasi tambahan seperti "Potongan Harga" atau "PPnBM"
                         nama_barang = re.sub(r'Potongan Harga\s*=\s*Rp[\d.,]+', '', nama_barang)
-                        nama_barang = re.sub(r'PPnBM\s*\([\d.,]+%\)\s*=\s*Rp[\d.,]+', '', nama_barang)
-                        nama_barang = nama_barang.strip()
+                        nama_barang = re.sub(r'PPnBM\s*\([\d.,]+%\)\s*=\s*Rp[\d.,]+', '', nama_barang).strip()
                         
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
                         if harga_qty_info:
@@ -71,9 +78,9 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                         ppn = total - dpp
                         
                         item = [
-                            no_fp if no_fp else "Tidak ditemukan", 
-                            nama_penjual if nama_penjual else "Tidak ditemukan", 
-                            nama_pembeli if nama_pembeli else "Tidak ditemukan", 
+                            no_fp or "Tidak ditemukan", 
+                            nama_penjual or "Tidak ditemukan", 
+                            nama_pembeli or "Tidak ditemukan", 
                             nama_barang, harga, unit, qty, total, dpp, ppn, 
                             tanggal_faktur  
                         ]
@@ -92,11 +99,10 @@ def main_app():
     if uploaded_files:
         all_data = []
         for uploaded_file in uploaded_files:
-            with pdfplumber.open(uploaded_file) as pdf:
-                text = pdf.pages[0].extract_text()  # Ambil teks dari halaman pertama
-                tanggal_faktur = extract_tanggal_faktur(text)
-                if not tanggal_faktur:
-                    tanggal_faktur = st.text_input(f"Masukkan Tanggal Faktur untuk {uploaded_file.name} (format: DD-MM-YYYY)")
+            tanggal_faktur = get_tanggal_faktur_from_pdf(uploaded_file)
+            if not tanggal_faktur:
+                st.error(f"Tanggal faktur tidak ditemukan dalam {uploaded_file.name}. Pastikan format faktur sesuai.")
+                continue
             
             detected_item_count = count_items_in_pdf(uploaded_file)
             extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
