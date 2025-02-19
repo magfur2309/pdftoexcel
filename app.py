@@ -48,60 +48,30 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
     total_items_found = 0
-
+    
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                no_fp_match = re.search(r'Kode dan Nomor Seri Faktur Pajak:\s*(\d+)', text)
-                if no_fp_match:
-                    no_fp = no_fp_match.group(1)
-                
-                penjual_match = re.search(r'Nama\s*:\s*([\w\s\-.,&]+)\nAlamat', text)
-                if penjual_match:
-                    nama_penjual = penjual_match.group(1).strip()
-                
-                pembeli_match = re.search(r'Pembeli Barang Kena Pajak/Penerima Jasa Kena Pajak:\s*Nama\s*:\s*([\w\s\-.,&]+)\nAlamat', text)
-                if pembeli_match:
-                    nama_pembeli = pembeli_match.group(1).strip()
-            
             table = page.extract_table()
             if table:
-                total_items_found += len(table) - 1
-                previous_row = None
-                for row in table:
-                    if len(row) >= 4 and row[0].isdigit():
-                        if previous_row and row[0] == "":
-                            previous_row[2] += " " + " ".join(row[2].split("\n")).strip()
-                            continue
-                        
-                        cleaned_lines = [line for line in row[2].split("\n") if not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
-                        nama_barang = " ".join(cleaned_lines).strip()
-                        
-                        try:
-                            harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
-                            if harga_qty_info:
-                                harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
-                                qty = int(float(harga_qty_info.group(2).replace('.', '').replace(',', '.')))
-                                unit = harga_qty_info.group(3)
-                            else:
-                                harga, qty, unit = 0, 0, "Unknown"
-                        except ValueError:
-                            harga, qty, unit = 0, 0, "Unknown"
-                        
-                        total = harga * qty
-                        dpp = total / 1.11
-                        ppn = total - dpp
-                        
-                        item = [
-                            no_fp if no_fp else "Tidak ditemukan", 
-                            nama_penjual if nama_penjual else "Tidak ditemukan", 
-                            nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                            nama_barang, harga, unit, qty, total, dpp, ppn, 
-                            tanggal_faktur  
-                        ]
-                        data.append(item)
-                        previous_row = item
+                valid_rows = [row for row in table if len(row) >= 4 and row[0].isdigit()]
+                total_items_found += len(valid_rows)
+                
+                for row in valid_rows:
+                    nama_barang = row[2].strip() if row[2] else "Tidak ditemukan"
+                    harga = int(row[3].replace('.', '').replace(',', '.')) if row[3] else 0
+                    qty = int(row[4].replace('.', '').replace(',', '.')) if row[4] else 0
+                    total = harga * qty
+                    dpp = total / 1.11
+                    ppn = total - dpp
+                    
+                    item = [
+                        no_fp if no_fp else "Tidak ditemukan", 
+                        nama_penjual if nama_penjual else "Tidak ditemukan", 
+                        nama_pembeli if nama_pembeli else "Tidak ditemukan", 
+                        nama_barang, harga, "Unit", qty, total, dpp, ppn, 
+                        tanggal_faktur  
+                    ]
+                    data.append(item)
     
     if total_items_found > 0 and total_items_found != len(data):
         st.warning(f"Jumlah item tidak cocok untuk {pdf_file.name}: Ditemukan {total_items_found}, diekstrak {len(data)}")
