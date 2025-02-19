@@ -27,14 +27,14 @@ def login_page():
                 if check_login(username, password):
                     st.session_state.logged_in = True
                     st.session_state.username = username
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("Username atau password salah")
     else:
         st.success(f"Selamat datang, {st.session_state.username}!")
         if st.button("Logout"):
             st.session_state.logged_in = False
-            st.experimental_rerun()
+            st.rerun()
 
 def find_invoice_date(pdf_file):
     month_map = {
@@ -85,7 +85,7 @@ def main_app():
         
         if st.button("Logout"):
             st.session_state.logged_in = False
-            st.experimental_rerun()
+            st.rerun()
 
 if __name__ == "__main__":
     main_app()
