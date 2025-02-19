@@ -7,12 +7,19 @@ import re
 from login import login_page
 
 def main_app():
-    if "logged_in" not in st.session_state or not st.session_state["logged_in"]:
-        st.warning("Silakan login terlebih dahulu.")
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+    
+    if not st.session_state["logged_in"]:
         login_page()
         return
     
     st.title("Konversi Faktur Pajak PDF ke Excel")
+    
+    if st.button("Logout"):
+        st.session_state["logged_in"] = False
+        st.experimental_rerun()
+    
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
     
     if uploaded_files:
