@@ -4,40 +4,54 @@ import pdfplumber
 import io
 import re
 
-def find_invoice_date(pdf_file):
-    """Mencari tanggal faktur dalam PDF, mulai dari halaman pertama."""
-    month_map = {
-        "Januari": "01", "Februari": "02", "Maret": "03", "April": "04", "Mei": "05", "Juni": "06", 
-        "Juli": "07", "Agustus": "08", "September": "09", "Oktober": "10", "November": "11", "Desember": "12"
+def login_page():
+    """Login Convert PDF To Excel"""
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+
+    if st.session_state["logged_in"]:
+        return True
+    
+    st.title("Login Convert PDF FP To Excel")
+    username = st.text_input("Username", key="username")
+    password = st.text_input("Password", type="password", key="password")
+    login_btn = st.button("Login")
+    
+    if login_btn:
+        if (username == "admin" and password == "admin") or (username == "demo" and password == "123456"):
+            st.session_state["logged_in"] = True
+            st.session_state["user"] = username
+            st.experimental_rerun()
+        else:
+            st.error("Username atau password salah!")
+    
+    return False
+
+def extract_tanggal_faktur(pdf):
+    month_mapping = {
+        "Januari": "01", "Februari": "02", "Maret": "03", "April": "04",
+        "Mei": "05", "Juni": "06", "Juli": "07", "Agustus": "08",
+        "September": "09", "Oktober": "10", "November": "11", "Desember": "12"
     }
-    with pdfplumber.open(pdf_file) as pdf:
-        for page in pdf.pages:
+    tanggal_faktur = "Tidak ditemukan"
+    
+    with pdfplumber.open(pdf) as pdf_obj:
+        for page in pdf_obj.pages:
             text = page.extract_text()
             if text:
                 date_match = re.search(r'(\d{1,2})\s*(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s*(\d{4})', text, re.IGNORECASE)
                 if date_match:
                     day, month, year = date_match.groups()
-                    return f"{day.zfill(2)}/{month_map[month]}/{year}"
-    return "Tidak ditemukan"
+                    tanggal_faktur = f"{year}-{month_mapping[month]}-{day.zfill(2)}"
+                    break  
+    
+    return tanggal_faktur
 
-def count_items_in_pdf(pdf_file):
-    """Menghitung jumlah item dalam PDF berdasarkan pola nomor urut."""
-    item_count = 0
-    with pdfplumber.open(pdf_file) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                matches = re.findall(r'^(\d{1,3})\s+000000', text, re.MULTILINE)
-                item_count += len(matches)
-    return item_count
-
-def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
+def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
-    item_counter = 0
-    
+
     with pdfplumber.open(pdf_file) as pdf:
-        previous_row = None
         for page in pdf.pages:
             text = page.extract_text()
             if text:
@@ -55,20 +69,15 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
             
             table = page.extract_table()
             if table:
+                previous_row = None
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
                         if previous_row and row[0] == "":
-                            previous_row[3] += " " + " ".join(row[2].split("\n")).strip()
+                            previous_row[2] += " " + " ".join(row[2].split("\n")).strip()
                             continue
                         
-                        nama_barang = " ".join(row[2].split("\n")).strip()
-                        nama_barang = re.sub(r'Rp [\d.,]+ x [\d.,]+ \w+', '', nama_barang)
-                        nama_barang = re.sub(r'PPnBM \(\d+,?\d*%\) = Rp [\d.,]+', '', nama_barang)
-                        nama_barang = re.sub(r'Potongan Harga = Rp [\d.,]+', '', nama_barang)
-                        nama_barang = nama_barang.strip()
-                        
-                        potongan_harga_match = re.search(r'Potongan Harga = Rp ([\d.,]+)', row[2])
-                        potongan_harga = int(float(potongan_harga_match.group(1).replace('.', '').replace(',', '.'))) if potongan_harga_match else 0
+                        cleaned_lines = [line for line in row[2].split("\n") if not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
+                        nama_barang = " ".join(cleaned_lines).strip()
                         
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
                         if harga_qty_info:
@@ -79,22 +88,18 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                             harga, qty, unit = 0, 0, "Unknown"
                         
                         total = harga * qty
-                        dpp = (total - potongan_harga) / 1.11
-                        ppn = (total - potongan_harga) - dpp
+                        dpp = total / 1.11
+                        ppn = total - dpp
                         
                         item = [
                             no_fp if no_fp else "Tidak ditemukan", 
                             nama_penjual if nama_penjual else "Tidak ditemukan", 
                             nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                            nama_barang, harga, unit, qty, total, potongan_harga, dpp, ppn, 
+                            nama_barang, harga, unit, qty, total, dpp, ppn, 
                             tanggal_faktur  
                         ]
                         data.append(item)
                         previous_row = item
-                        item_counter += 1
-                        
-                        if item_counter >= expected_item_count:
-                            break  
     return data
 
 def main_app():
@@ -104,19 +109,13 @@ def main_app():
     if uploaded_files:
         all_data = []
         for uploaded_file in uploaded_files:
-            tanggal_faktur = find_invoice_date(uploaded_file)
-            detected_item_count = count_items_in_pdf(uploaded_file)
-            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
-            extracted_item_count = len(extracted_data)
-            
-            if detected_item_count != extracted_item_count and detected_item_count != 0:
-                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
-            
+            tanggal_faktur = extract_tanggal_faktur(uploaded_file)  
+            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur)
             if extracted_data:
                 all_data.extend(extracted_data)
         
         if all_data:
-            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "Potongan Harga", "DPP", "PPN", "Tanggal Faktur"])
+            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "DPP", "PPN", "Tanggal Faktur"])
             df.index = df.index + 1  
             
             st.write("### Pratinjau Data yang Diekstrak")
@@ -132,4 +131,5 @@ def main_app():
             st.error("Gagal mengekstrak data. Pastikan format faktur sesuai.")
 
 if __name__ == "__main__":
-    main_app()
+    if login_page():
+        main_app()
