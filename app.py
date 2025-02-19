@@ -85,12 +85,20 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                         dpp = (total - potongan_harga) / 1.11
                         ppn = (total - potongan_harga) - dpp
                         
+                        # Sesuaikan urutan kolom sesuai permintaan
                         item = [
-                            no_fp if no_fp else "Tidak ditemukan", 
-                            nama_penjual if nama_penjual else "Tidak ditemukan", 
-                            nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                            nama_barang, harga, unit, qty, total, potongan_harga, dpp, ppn, 
-                            tanggal_faktur  
+                            no_fp if no_fp else "Tidak ditemukan",  # No FP
+                            nama_penjual if nama_penjual else "Tidak ditemukan",  # Nama Penjual
+                            nama_pembeli if nama_pembeli else "Tidak ditemukan",  # Nama Pembeli
+                            tanggal_faktur,  # Tanggal Faktur
+                            nama_barang,  # Nama Barang
+                            qty,  # Qty
+                            unit,  # Satuan
+                            harga,  # Harga
+                            potongan_harga,  # Potongan Harga
+                            total,  # Total
+                            dpp,  # DPP
+                            ppn,  # PPN
                         ]
                         data.append(item)
                         previous_row = item
@@ -119,8 +127,12 @@ def main_app():
                 all_data.extend(extracted_data)
         
         if all_data:
-            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Tanggal Faktur", "Nama Barang", "Harga", "Unit", "QTY", "Total", "Potongan Harga", "DPP", "PPN"])
-            df.index = df.index + 1  
+            # Sesuaikan urutan kolom sesuai permintaan
+            df = pd.DataFrame(all_data, columns=[
+                "No FP", "Nama Penjual", "Nama Pembeli", "Tanggal Faktur", "Nama Barang", 
+                "Qty", "Satuan", "Harga", "Potongan Harga", "Total", "DPP", "PPN"
+            ])
+            df.index = df.index + 1  # Mulai nomor indeks dari 1
             
             st.write("### Pratinjau Data yang Diekstrak")
             st.dataframe(df)
