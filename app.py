@@ -5,7 +5,7 @@ import io
 import re
 
 def login_page():
-    """Login Convert PDF To Excel"""
+    """Halaman login sederhana"""
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
 
@@ -21,7 +21,7 @@ def login_page():
         if (username == "admin" and password == "admin") or (username == "demo" and password == "123456"):
             st.session_state["logged_in"] = True
             st.session_state["user"] = username
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("Username atau password salah!")
     
