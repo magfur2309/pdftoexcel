@@ -53,15 +53,21 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
         for page in pdf.pages:
             table = page.extract_table()
             if table:
-                valid_rows = [row for row in table if len(row) >= 4 and row[0].isdigit()]
+                valid_rows = [row for row in table if len(row) >= 4 and row[0].isdigit() and row[2].strip()]
                 total_items_found += len(valid_rows)
                 
                 for row in valid_rows:
-                    nama_barang = row[2].strip() if row[2] else "Tidak ditemukan"
-                    harga = int(row[3].replace('.', '').replace(',', '.')) if row[3] else 0
-                    qty = int(row[4].replace('.', '').replace(',', '.')) if row[4] else 0
+                    nama_barang = row[2].strip()
+                    try:
+                        harga = int(row[3].replace('.', '').replace(',', '.')) if row[3] else 0
+                    except ValueError:
+                        harga = 0
+                    try:
+                        qty = int(row[4].replace('.', '').replace(',', '.')) if row[4] else 0
+                    except ValueError:
+                        qty = 0
                     total = harga * qty
-                    dpp = total / 1.11
+                    dpp = total / 1.11 if total > 0 else 0
                     ppn = total - dpp
                     
                     item = [
