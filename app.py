@@ -74,40 +74,20 @@ def extract_data_from_pdf(pdf_file):
                         ]
                         data.append(item)
     return data
-    def main_app():
+
+def main_app():
     st.title("Konversi Faktur Pajak PDF ke Excel")
-    uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
-    
-    if uploaded_files:
-        all_data = []
-        for uploaded_file in uploaded_files:
-            tanggal_faktur = "2025-01-09"  # Placeholder untuk tanggal faktur
-            detected_item_count = count_items_in_pdf(uploaded_file)
-            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
-            extracted_item_count = len(extracted_data)
-            
-            # Tampilkan peringatan hanya jika jumlah item tidak cocok dan ditemukan item > 0
-            if detected_item_count != extracted_item_count and detected_item_count != 0:
-                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
-            
-            if extracted_data:
-                all_data.extend(extracted_data)
-        
-        if all_data:
-            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "DPP", "PPN", "Tanggal Faktur"])
-            df.index = df.index + 1  
-            
-            st.write("### Pratinjau Data yang Diekstrak")
-            st.dataframe(df)
-            
+    uploaded_file = st.file_uploader("Unggah file PDF", type=["pdf"])
+    if uploaded_file is not None:
+        data = extract_data_from_pdf(uploaded_file)
+        if data:
+            df = pd.DataFrame(data, columns=["No Faktur", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "Qty", "Total", "DPP", "PPN", "Tanggal Faktur"])
+            st.write(df)
             output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
-            output.seek(0)
-            
-            st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        else:
-            st.error("Gagal mengekstrak data. Pastikan format faktur sesuai.")
+            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+                df.to_excel(writer, sheet_name="Faktur", index=False)
+                writer.close()
+            st.download_button(label="Unduh Excel", data=output.getvalue(), file_name="faktur.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 if __name__ == "__main__":
     main_app()
