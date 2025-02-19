@@ -78,11 +78,11 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                         else:
                             harga, qty, unit = 0, 0, "Unknown"
                         
-                        total = harga * qty
+                        total = (harga * qty) - potongan_harga
                         potongan_harga = min(potongan_harga, total)
                         
-                        dpp = total - potongan_harga
-                        ppn = round(dpp * 0.11, 2)
+                        ppn = round(total * 0.11, 2)
+                        dpp = total - ppn
                         
                         item = [no_fp if no_fp else "Tidak ditemukan", nama_penjual if nama_penjual else "Tidak ditemukan", nama_pembeli if nama_pembeli else "Tidak ditemukan", tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
                         data.append(item)
