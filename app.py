@@ -23,6 +23,7 @@ def extract_tanggal_faktur(pdf):
 def extract_data_from_pdf(pdf_file):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
+    detected_item_count = 0
     
     with pdfplumber.open(pdf_file) as pdf:
         tanggal_faktur = extract_tanggal_faktur(pdf)
@@ -46,6 +47,7 @@ def extract_data_from_pdf(pdf_file):
             if table:
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
+                        detected_item_count += 1
                         if previous_row and row[0] == "":
                             previous_row[3] += " " + " ".join(row[2].split("\n")).strip()
                             continue
@@ -77,7 +79,8 @@ def extract_data_from_pdf(pdf_file):
                         ]
                         data.append(item)
                         previous_row = item
-    return data
+    
+    return data, detected_item_count
 
 def main_app():
     st.title("Konversi Faktur Pajak PDF ke Excel")
@@ -86,7 +89,12 @@ def main_app():
     if uploaded_files:
         all_data = []
         for uploaded_file in uploaded_files:
-            extracted_data = extract_data_from_pdf(uploaded_file)
+            extracted_data, detected_item_count = extract_data_from_pdf(uploaded_file)
+            extracted_item_count = len(extracted_data)
+            
+            if detected_item_count != extracted_item_count and detected_item_count > 0:
+                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
+            
             all_data.extend(extracted_data)
         
         if all_data:
