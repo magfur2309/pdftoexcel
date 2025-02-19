@@ -3,7 +3,6 @@ import pandas as pd
 import pdfplumber
 import io
 import re
-from decimal import Decimal
 
 def count_items_in_pdf(pdf_file):
     """Menghitung jumlah item dalam PDF berdasarkan pola nomor urut."""
@@ -12,27 +11,13 @@ def count_items_in_pdf(pdf_file):
         for page in pdf.pages:
             text = page.extract_text()
             if text:
-                matches = re.findall(r'^\d{1,3}\s+000000', text, re.MULTILINE)
+                matches = re.findall(r'^(\d{1,3})\s+000000', text, re.MULTILINE)
                 item_count += len(matches)
     return item_count
 
-def clean_nama_barang(nama_barang):
-    """Membersihkan nama barang dari informasi harga, kuantitas, potongan harga, dan PPnBM."""
-    nama_barang = re.sub(r'Rp\s[\d.,]+\sx\s[\d.,]+\s\w+', '', nama_barang).strip()
-    nama_barang = re.sub(r'Potongan Harga\s*=\s*Rp\s*[\d.,]+', '', nama_barang).strip()
-    nama_barang = re.sub(r'PPnBM\s*\([\d.,]+%\)\s*=\s*Rp\s*[\d.,]+', '', nama_barang).strip()
-    return nama_barang
-
-def parse_number(value):
-    """Mengonversi string angka dari format Indonesia ke float."""
-    try:
-        return Decimal(value.replace('.', '').replace(',', '.'))
-    except:
-        return Decimal(0)
-
-def extract_data_from_pdf(pdf_file):
+def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
     data = []
-    no_fp, nama_penjual, nama_pembeli, tanggal_faktur = None, None, None, None
+    no_fp, nama_penjual, nama_pembeli = None, None, None
     item_counter = 0
     
     with pdfplumber.open(pdf_file) as pdf:
@@ -40,11 +25,6 @@ def extract_data_from_pdf(pdf_file):
         for page in pdf.pages:
             text = page.extract_text()
             if text:
-                if not tanggal_faktur:
-                    tanggal_match = re.search(r'Tanggal Faktur:\s*(\d{4}-\d{2}-\d{2})', text)
-                    if tanggal_match:
-                        tanggal_faktur = tanggal_match.group(1)
-                
                 no_fp_match = re.search(r'Kode dan Nomor Seri Faktur Pajak:\s*(\d+)', text)
                 if no_fp_match:
                     no_fp = no_fp_match.group(1)
@@ -62,34 +42,35 @@ def extract_data_from_pdf(pdf_file):
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
                         if previous_row and row[0] == "":
-                            previous_row[3] += " " + clean_nama_barang(row[2])
+                            previous_row[3] += " " + " ".join(row[2].split("\n")).strip()
                             continue
                         
-                        nama_barang = clean_nama_barang(row[2])
+                        nama_barang = " ".join(row[2].split("\n")).strip()
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
-                        
                         if harga_qty_info:
-                            harga = parse_number(harga_qty_info.group(1))
-                            qty = parse_number(harga_qty_info.group(2))
+                            harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
+                            qty = int(float(harga_qty_info.group(2).replace('.', '').replace(',', '.')))
                             unit = harga_qty_info.group(3)
                         else:
-                            harga, qty, unit = Decimal(0), Decimal(0), "Unknown"
+                            harga, qty, unit = 0, 0, "Unknown"
                         
                         total = harga * qty
-                        dpp = total / Decimal(1.11)
+                        dpp = total / 1.11
                         ppn = total - dpp
                         
                         item = [
                             no_fp if no_fp else "Tidak ditemukan", 
                             nama_penjual if nama_penjual else "Tidak ditemukan", 
                             nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                            nama_barang, 
-                            float(harga), unit, int(qty), float(total), float(dpp), float(ppn), 
-                            tanggal_faktur if tanggal_faktur else "Tidak ditemukan"
+                            nama_barang, harga, unit, qty, total, dpp, ppn, 
+                            tanggal_faktur  
                         ]
                         data.append(item)
                         previous_row = item
                         item_counter += 1
+                        
+                        if item_counter >= expected_item_count:
+                            break  
     return data
 
 def main_app():
@@ -99,7 +80,14 @@ def main_app():
     if uploaded_files:
         all_data = []
         for uploaded_file in uploaded_files:
-            extracted_data = extract_data_from_pdf(uploaded_file)
+            tanggal_faktur = "2025-01-09"  # Placeholder untuk tanggal faktur
+            detected_item_count = count_items_in_pdf(uploaded_file)
+            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
+            extracted_item_count = len(extracted_data)
+            
+            # Tampilkan peringatan hanya jika jumlah item tidak cocok dan ditemukan item > 0
+            if detected_item_count != extracted_item_count and detected_item_count != 0:
+                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
             
             if extracted_data:
                 all_data.extend(extracted_data)
