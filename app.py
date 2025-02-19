@@ -4,31 +4,32 @@ import pdfplumber
 import io
 import re
 
-def extract_tanggal_faktur(text):
-    """Mengekstrak tanggal faktur dari teks PDF."""
-    match = re.search(r'(\d{2})\s*([A-Za-z]+)\s*(\d{4})', text)
-    if match:
-        bulan_mapping = {
-            "Januari": "01", "Februari": "02", "Maret": "03", "April": "04", "Mei": "05", "Juni": "06",
-            "Juli": "07", "Agustus": "08", "September": "09", "Oktober": "10", "November": "11", "Desember": "12"
-        }
-        day, month, year = match.groups()
-        month = bulan_mapping.get(month, "00")
-        return f"{year}-{month}-{day}"
+def extract_tanggal_faktur(pdf):
+    """Mengekstrak tanggal faktur dari seluruh halaman PDF."""
+    for page in pdf.pages:
+        text = page.extract_text()
+        if text:
+            match = re.search(r'(\d{2})\s*([A-Za-z]+)\s*(\d{4})', text)
+            if match:
+                bulan_mapping = {
+                    "Januari": "01", "Februari": "02", "Maret": "03", "April": "04", "Mei": "05", "Juni": "06",
+                    "Juli": "07", "Agustus": "08", "September": "09", "Oktober": "10", "November": "11", "Desember": "12"
+                }
+                day, month, year = match.groups()
+                month = bulan_mapping.get(month, "00")
+                return f"{year}-{month}-{day}"
     return "Tidak ditemukan"
 
 def extract_data_from_pdf(pdf_file):
     data = []
-    no_fp, nama_penjual, nama_pembeli, tanggal_faktur = None, None, None, None
+    no_fp, nama_penjual, nama_pembeli = None, None, None
     
     with pdfplumber.open(pdf_file) as pdf:
+        tanggal_faktur = extract_tanggal_faktur(pdf)
         previous_row = None
         for page in pdf.pages:
             text = page.extract_text()
             if text:
-                if not tanggal_faktur:
-                    tanggal_faktur = extract_tanggal_faktur(text)
-                
                 no_fp_match = re.search(r'Kode dan Nomor Seri Faktur Pajak:\s*(\d+)', text)
                 if no_fp_match:
                     no_fp = no_fp_match.group(1)
