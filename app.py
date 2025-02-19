@@ -4,22 +4,6 @@ import pdfplumber
 import io
 import re
 
-def extract_tanggal_faktur(text):
-    """Mengekstrak tanggal faktur dari teks PDF."""
-    tanggal_match = re.search(r'Tanggal\s*:\s*(\d{2}-\d{2}-\d{4})', text)
-    return tanggal_match.group(1) if tanggal_match else None
-
-def get_tanggal_faktur_from_pdf(pdf_file):
-    """Mencari tanggal faktur dari semua halaman PDF."""
-    with pdfplumber.open(pdf_file) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                tanggal_faktur = extract_tanggal_faktur(text)
-                if tanggal_faktur:
-                    return tanggal_faktur
-    return None
-
 def count_items_in_pdf(pdf_file):
     """Menghitung jumlah item dalam PDF berdasarkan pola nomor urut."""
     item_count = 0
@@ -62,9 +46,6 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                             continue
                         
                         nama_barang = " ".join(row[2].split("\n")).strip()
-                        nama_barang = re.sub(r'Potongan Harga\s*=\s*Rp[\d.,]+', '', nama_barang)
-                        nama_barang = re.sub(r'PPnBM\s*\([\d.,]+%\)\s*=\s*Rp[\d.,]+', '', nama_barang).strip()
-                        
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
                         if harga_qty_info:
                             harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
@@ -78,9 +59,9 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                         ppn = total - dpp
                         
                         item = [
-                            no_fp or "Tidak ditemukan", 
-                            nama_penjual or "Tidak ditemukan", 
-                            nama_pembeli or "Tidak ditemukan", 
+                            no_fp if no_fp else "Tidak ditemukan", 
+                            nama_penjual if nama_penjual else "Tidak ditemukan", 
+                            nama_pembeli if nama_pembeli else "Tidak ditemukan", 
                             nama_barang, harga, unit, qty, total, dpp, ppn, 
                             tanggal_faktur  
                         ]
@@ -99,15 +80,12 @@ def main_app():
     if uploaded_files:
         all_data = []
         for uploaded_file in uploaded_files:
-            tanggal_faktur = get_tanggal_faktur_from_pdf(uploaded_file)
-            if not tanggal_faktur:
-                st.error(f"Tanggal faktur tidak ditemukan dalam {uploaded_file.name}. Pastikan format faktur sesuai.")
-                continue
-            
+            tanggal_faktur = "2025-01-09"  # Placeholder untuk tanggal faktur
             detected_item_count = count_items_in_pdf(uploaded_file)
             extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
             extracted_item_count = len(extracted_data)
             
+            # Tampilkan peringatan hanya jika jumlah item tidak cocok dan ditemukan item > 0
             if detected_item_count != extracted_item_count and detected_item_count != 0:
                 st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
             
