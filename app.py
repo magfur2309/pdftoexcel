@@ -66,21 +66,34 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
             
             table = page.extract_table()
             if table:
+                previous_row = None
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
-                        nama_barang = row[2].strip()
-                        harga = int(row[3].replace('.', '').replace(',', '.')) if row[3] else 0
-                        qty = int(row[4].replace('.', '').replace(',', '.')) if row[4] else 0
-                        total = harga * qty
+                        if previous_row and row[0] == "":
+                            previous_row[2] += " " + " ".join(row[2].split("\n")).strip()
+                            continue
+                        
+                        cleaned_lines = [line for line in row[2].split("\n") if not re.search(r'Rp\s[\d,.]+|PPnBM|Potongan Harga', line)]
+                        nama_barang = " ".join(cleaned_lines).strip()
+                        
+                        try:
+                            harga = int(float(row[3].replace('.', '').replace(',', '.'))) if row[3] and re.search(r'\d', row[3]) else 0
+                        except ValueError:
+                            harga = 0  
+                        
+                        total = harga 
                         dpp = total / 1.11
                         ppn = total - dpp
                         
-                        data.append([
+                        item = [
                             no_fp if no_fp else "Tidak ditemukan", 
                             nama_penjual if nama_penjual else "Tidak ditemukan", 
                             nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                            nama_barang, harga, qty, total, dpp, ppn, tanggal_faktur
-                        ])
+                            nama_barang, harga, "Unit", 1, total, dpp, ppn, 
+                            tanggal_faktur  
+                        ]
+                        data.append(item)
+                        previous_row = item
     return data
 
 def main_app():
@@ -94,13 +107,9 @@ def main_app():
             extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur)
             if extracted_data:
                 all_data.extend(extracted_data)
-                ditemukan = len(extracted_data)
-                diekstrak = sum(1 for item in extracted_data if item[3])
-                if ditemukan > 0 and ditemukan != diekstrak:
-                    st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {ditemukan}, diekstrak {diekstrak}")
         
         if all_data:
-            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "QTY", "Total", "DPP", "PPN", "Tanggal Faktur"])
+            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "DPP", "PPN", "Tanggal Faktur"])
             df.index = df.index + 1  
             
             st.write("### Pratinjau Data yang Diekstrak")
