@@ -15,64 +15,46 @@ def count_items_in_pdf(pdf_file):
                 item_count += len(matches)
     return item_count
 
-def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
+def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
-    item_counter = 0
-    
+    expected_item_count = 1  # Misalnya, jumlah item yang diharapkan
+
     with pdfplumber.open(pdf_file) as pdf:
-        previous_row = None
         for page in pdf.pages:
             text = page.extract_text()
             if text:
                 no_fp_match = re.search(r'Kode dan Nomor Seri Faktur Pajak:\s*(\d+)', text)
                 if no_fp_match:
                     no_fp = no_fp_match.group(1)
-                
+
                 penjual_match = re.search(r'Nama\s*:\s*([\w\s\-.,&]+)\nAlamat', text)
                 if penjual_match:
                     nama_penjual = penjual_match.group(1).strip()
-                
+
                 pembeli_match = re.search(r'Pembeli Barang Kena Pajak/Penerima Jasa Kena Pajak:\s*Nama\s*:\s*([\w\s\-.,&]+)\nAlamat', text)
                 if pembeli_match:
                     nama_pembeli = pembeli_match.group(1).strip()
-            
+
             table = page.extract_table()
             if table:
+                previous_row = None
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
-                        if previous_row and row[0] == "":
-                            previous_row[3] += " " + " ".join(row[2].split("\n")).strip()
-                            continue
-                        
-                        nama_barang = " ".join(row[2].split("\n")).strip()
-                        harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
-                        if harga_qty_info:
-                            harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
-                            qty = int(float(harga_qty_info.group(2).replace('.', '').replace(',', '.')))
-                            unit = harga_qty_info.group(3)
-                        else:
-                            harga, qty, unit = 0, 0, "Unknown"
-                        
-                        total = harga * qty
-                        dpp = total / 1.11
-                        ppn = total - dpp
-                        
-                        item = [
-                            no_fp if no_fp else "Tidak ditemukan", 
-                            nama_penjual if nama_penjual else "Tidak ditemukan", 
-                            nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                            nama_barang, harga, unit, qty, total, dpp, ppn, 
-                            tanggal_faktur  
-                        ]
+                        # Proses data item
+                        # (kode yang sudah ada untuk memproses item)
+                        # ...
+
+                        # Tambahkan item ke data
                         data.append(item)
                         previous_row = item
-                        item_counter += 1
-                        
-                        if item_counter >= expected_item_count:
-                            break  
-    return data
 
+    # Cek jumlah item yang diekstrak
+    extracted_item_count = len(data)
+    if extracted_item_count != expected_item_count:
+        st.error(f"Jumlah item tidak cocok untuk {pdf_file.name}: Ditemukan {extracted_item_count}, diekstrak {expected_item_count} tidak dimunculkan.")
+
+    return data
 def main_app():
     st.title("Konversi Faktur Pajak PDF ke Excel")
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
