@@ -30,6 +30,7 @@ def count_items_in_pdf(pdf_file):
                 matches = re.findall(r'^(\d{1,3})\s+000000', text, re.MULTILINE)
                 item_count += len(matches)
     return item_count
+
 def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
@@ -51,8 +52,6 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                 pembeli_match = re.search(r'Pembeli Barang Kena Pajak/Penerima Jasa Kena Pajak:\s*Nama\s*:\s*([\w\s\-.,&()]+)\nAlamat', text)
                 if pembeli_match:
                     nama_pembeli = pembeli_match.group(1).strip()
-                    
-                    # Pastikan "Nama Pembeli" tidak mengandung kata "Alamat"
                     nama_pembeli = re.sub(r'\bAlamat\b', '', nama_pembeli, flags=re.IGNORECASE).strip()
             
             table = page.extract_table()
@@ -66,10 +65,9 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                         nama_barang = " ".join(row[2].split("\n")).strip()
                         nama_barang = re.sub(r'Rp [\d.,]+ x [\d.,]+ \w+', '', nama_barang)
                         nama_barang = re.sub(r'PPnBM \(\d+,?\d*%\) = Rp [\d.,]+', '', nama_barang)
-                        nama_barang = re.sub(r'Potongan Harga = Rp [\d.,]+', '', nama_barang)
-                        nama_barang = nama_barang.strip()
+                        nama_barang = re.sub(r'Potongan Harga = Rp [\d.,]+', '', nama_barang).strip()
                         
-                        potongan_harga_match = re.search(r'Potongan Harga = Rp ([\d.,]+)', row[2])
+                        potongan_harga_match = re.search(r'Potongan Harga\s*=\s*Rp\s*([\d.,]+)', row[2])
                         potongan_harga = int(float(potongan_harga_match.group(1).replace('.', '').replace(',', '.'))) if potongan_harga_match else 0
                         
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
@@ -81,24 +79,12 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                             harga, qty, unit = 0, 0, "Unknown"
                         
                         total = harga * qty
-                        dpp = (total - potongan_harga) / 1.11
-                        ppn = (total - potongan_harga) - dpp
+                        potongan_harga = min(potongan_harga, total)
                         
-                        # Sesuaikan urutan kolom sesuai permintaan
-                        item = [
-                            no_fp if no_fp else "Tidak ditemukan",  # No FP
-                            nama_penjual if nama_penjual else "Tidak ditemukan",  # Nama Penjual
-                            nama_pembeli if nama_pembeli else "Tidak ditemukan",  # Nama Pembeli
-                            tanggal_faktur,  # Tanggal Faktur
-                            nama_barang,  # Nama Barang
-                            qty,  # Qty
-                            unit,  # Satuan
-                            harga,  # Harga
-                            potongan_harga,  # Potongan Harga
-                            total,  # Total
-                            dpp,  # DPP
-                            ppn,  # PPN
-                        ]
+                        dpp = round((total - potongan_harga) / 1.11, 2) if total > 0 else 0
+                        ppn = round((total - potongan_harga) - dpp, 2) if total > 0 else 0
+                        
+                        item = [no_fp if no_fp else "Tidak ditemukan", nama_penjual if nama_penjual else "Tidak ditemukan", nama_pembeli if nama_pembeli else "Tidak ditemukan", tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
                         data.append(item)
                         previous_row = item
                         item_counter += 1
@@ -106,6 +92,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                         if item_counter >= expected_item_count:
                             break  
     return data
+
 
 def main_app():
     st.title("Konversi Faktur Pajak PDF ke Excel")
