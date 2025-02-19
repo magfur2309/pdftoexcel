@@ -30,9 +30,9 @@ def parse_number(value):
     except:
         return Decimal(0)
 
-def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
+def extract_data_from_pdf(pdf_file):
     data = []
-    no_fp, nama_penjual, nama_pembeli = None, None, None
+    no_fp, nama_penjual, nama_pembeli, tanggal_faktur = None, None, None, None
     item_counter = 0
     
     with pdfplumber.open(pdf_file) as pdf:
@@ -40,6 +40,11 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
         for page in pdf.pages:
             text = page.extract_text()
             if text:
+                if not tanggal_faktur:
+                    tanggal_match = re.search(r'Tanggal Faktur:\s*(\d{4}-\d{2}-\d{2})', text)
+                    if tanggal_match:
+                        tanggal_faktur = tanggal_match.group(1)
+                
                 no_fp_match = re.search(r'Kode dan Nomor Seri Faktur Pajak:\s*(\d+)', text)
                 if no_fp_match:
                     no_fp = no_fp_match.group(1)
@@ -80,14 +85,11 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                             nama_pembeli if nama_pembeli else "Tidak ditemukan", 
                             nama_barang, 
                             float(harga), unit, int(qty), float(total), float(dpp), float(ppn), 
-                            tanggal_faktur  
+                            tanggal_faktur if tanggal_faktur else "Tidak ditemukan"
                         ]
                         data.append(item)
                         previous_row = item
                         item_counter += 1
-                        
-                        if item_counter >= expected_item_count:
-                            break  
     return data
 
 def main_app():
@@ -97,13 +99,7 @@ def main_app():
     if uploaded_files:
         all_data = []
         for uploaded_file in uploaded_files:
-            tanggal_faktur = "2025-01-09"  # Placeholder untuk tanggal faktur
-            detected_item_count = count_items_in_pdf(uploaded_file)
-            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
-            extracted_item_count = len(extracted_data)
-            
-            if detected_item_count != extracted_item_count and detected_item_count != 0:
-                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
+            extracted_data = extract_data_from_pdf(uploaded_file)
             
             if extracted_data:
                 all_data.extend(extracted_data)
