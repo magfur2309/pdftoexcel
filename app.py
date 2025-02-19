@@ -63,9 +63,11 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                         
                         nama_barang = " ".join(row[2].split("\n")).strip()
                         nama_barang = re.sub(r'Rp [\d.,]+ x [\d.,]+ \w+', '', nama_barang)
-                        nama_barang = re.sub(r'Potongan Harga = Rp [\d.,]+', '', nama_barang)
                         nama_barang = re.sub(r'PPnBM \(\d+,?\d*%\) = Rp [\d.,]+', '', nama_barang)
                         nama_barang = nama_barang.strip()
+                        
+                        potongan_harga_match = re.search(r'Potongan Harga = Rp ([\d.,]+)', row[2])
+                        potongan_harga = int(float(potongan_harga_match.group(1).replace('.', '').replace(',', '.'))) if potongan_harga_match else 0
                         
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
                         if harga_qty_info:
@@ -76,14 +78,14 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                             harga, qty, unit = 0, 0, "Unknown"
                         
                         total = harga * qty
-                        dpp = total / 1.11
-                        ppn = total - dpp
+                        dpp = (total - potongan_harga) / 1.11
+                        ppn = (total - potongan_harga) - dpp
                         
                         item = [
                             no_fp if no_fp else "Tidak ditemukan", 
                             nama_penjual if nama_penjual else "Tidak ditemukan", 
                             nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                            nama_barang, harga, unit, qty, total, dpp, ppn, 
+                            nama_barang, harga, unit, qty, total, potongan_harga, dpp, ppn, 
                             tanggal_faktur  
                         ]
                         data.append(item)
@@ -113,7 +115,7 @@ def main_app():
                 all_data.extend(extracted_data)
         
         if all_data:
-            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "DPP", "PPN", "Tanggal Faktur"])
+            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "Potongan Harga", "DPP", "PPN", "Tanggal Faktur"])
             df.index = df.index + 1  
             
             st.write("### Pratinjau Data yang Diekstrak")
