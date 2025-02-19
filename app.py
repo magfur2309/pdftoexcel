@@ -3,6 +3,7 @@ import pandas as pd
 import pdfplumber
 import io
 import re
+from decimal import Decimal
 
 def count_items_in_pdf(pdf_file):
     """Menghitung jumlah item dalam PDF berdasarkan pola nomor urut."""
@@ -11,9 +12,23 @@ def count_items_in_pdf(pdf_file):
         for page in pdf.pages:
             text = page.extract_text()
             if text:
-                matches = re.findall(r'^(\d{1,3})\s+000000', text, re.MULTILINE)
+                matches = re.findall(r'^\d{1,3}\s+000000', text, re.MULTILINE)
                 item_count += len(matches)
     return item_count
+
+def clean_nama_barang(nama_barang):
+    """Membersihkan nama barang dari informasi harga, kuantitas, potongan harga, dan PPnBM."""
+    nama_barang = re.sub(r'Rp\s[\d.,]+\sx\s[\d.,]+\s\w+', '', nama_barang).strip()
+    nama_barang = re.sub(r'Potongan Harga\s*=\s*Rp\s*[\d.,]+', '', nama_barang).strip()
+    nama_barang = re.sub(r'PPnBM\s*\([\d.,]+%\)\s*=\s*Rp\s*[\d.,]+', '', nama_barang).strip()
+    return nama_barang
+
+def parse_number(value):
+    """Mengonversi string angka dari format Indonesia ke float."""
+    try:
+        return Decimal(value.replace('.', '').replace(',', '.'))
+    except:
+        return Decimal(0)
 
 def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
     data = []
@@ -42,27 +57,29 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
                         if previous_row and row[0] == "":
-                            previous_row[3] += " " + " ".join(row[2].split("\n")).strip()
+                            previous_row[3] += " " + clean_nama_barang(row[2])
                             continue
                         
-                        nama_barang = " ".join(row[2].split("\n")).strip()
+                        nama_barang = clean_nama_barang(row[2])
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
+                        
                         if harga_qty_info:
-                            harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
-                            qty = int(float(harga_qty_info.group(2).replace('.', '').replace(',', '.')))
+                            harga = parse_number(harga_qty_info.group(1))
+                            qty = parse_number(harga_qty_info.group(2))
                             unit = harga_qty_info.group(3)
                         else:
-                            harga, qty, unit = 0, 0, "Unknown"
+                            harga, qty, unit = Decimal(0), Decimal(0), "Unknown"
                         
                         total = harga * qty
-                        dpp = total / 1.11
+                        dpp = total / Decimal(1.11)
                         ppn = total - dpp
                         
                         item = [
                             no_fp if no_fp else "Tidak ditemukan", 
                             nama_penjual if nama_penjual else "Tidak ditemukan", 
                             nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                            nama_barang, harga, unit, qty, total, dpp, ppn, 
+                            nama_barang, 
+                            float(harga), unit, int(qty), float(total), float(dpp), float(ppn), 
                             tanggal_faktur  
                         ]
                         data.append(item)
@@ -85,7 +102,6 @@ def main_app():
             extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
             extracted_item_count = len(extracted_data)
             
-            # Tampilkan peringatan hanya jika jumlah item tidak cocok dan ditemukan item > 0
             if detected_item_count != extracted_item_count and detected_item_count != 0:
                 st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
             
