@@ -11,7 +11,7 @@ def check_login():
     login_button = st.button("Login")
     
     user_data = {
-        "admin": hash_password("password123"),
+        "admin": hash_password("123"),
         "user": hash_password("userpass")
     }
     
