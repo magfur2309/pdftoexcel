@@ -4,61 +4,20 @@ import pdfplumber
 import io
 import re
 
-def login_page():
-    if st.session_state.get("logged_in"):
-        return True
-    
-    st.markdown(
-        """
-        <style>
-            .login-container {
-                max-width: 400px;
-                margin: auto;
-                padding: 2rem;
-                background: #121212;
-                color: white;
-                text-align: center;
-                border-radius: 10px;
-            }
-            input {
-                margin-bottom: 10px;
-            }
-            .login-btn {
-                background-color: #007BFF;
-                color: white;
-                width: 100%;
-                padding: 10px;
-                border: none;
-                border-radius: 5px;
-            }
-        </style>
-        <div class='login-container'>
-            <h2>Login Convert PDF FP To Excel</h2>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    
-    username = st.text_input("Username", key="username")
-    password = st.text_input("Password", type="password", key="password")
-    login_btn = st.button("Login", key="login", help="Masuk ke sistem")
-    
-    if (username and password) and (login_btn or st.session_state.get("attempt_login")):
-        if (username == "admin" and password == "admin") or (username == "demo" and password == "123456"):
-            st.session_state["logged_in"] = True
-            st.session_state["user"] = username
-            st.rerun()
-        else:
-            st.error("Username atau password salah!")
-            st.session_state["attempt_login"] = False
-    
-    return False
+def count_items_in_pdf(pdf_file):
+    """Menghitung jumlah item dalam PDF berdasarkan pola nomor urut."""
+    item_count = 0
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            table = page.extract_table()
+            if table:
+                for row in table:
+                    if len(row) >= 4 and row[0].isdigit():
+                        item_count += 1
+    return item_count
 
 def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
-    total_nama_barang_detected = 0
-    total_nama_barang_extracted = 0
-    
     no_fp, nama_penjual, nama_pembeli = None, None, None
     
     with pdfplumber.open(pdf_file) as pdf:
@@ -80,60 +39,63 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
             table = page.extract_table()
             if table:
                 for row in table:
-                    if len(row) >= 4 and row[0] and row[0].isdigit():
-                        total_nama_barang_detected += 1
+                    if len(row) >= 4 and row[0].isdigit():
+                        nama_barang = " ".join(row[2].split("\n")).strip()
+                        harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
+                        if harga_qty_info:
+                            harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
+                            qty = int(float(harga_qty_info.group(2).replace('.', '').replace(',', '.')))
+                            unit = harga_qty_info.group(3)
+                        else:
+                            harga, qty, unit = 0, 0, "Unknown"
                         
-                        nama_barang = row[2].strip() if row[2] else ""
+                        total = harga * qty
+                        dpp = total / 1.11
+                        ppn = total - dpp
                         
-                        if nama_barang:
-                            data.append([
-                                no_fp if no_fp else "Tidak ditemukan", 
-                                nama_penjual if nama_penjual else "Tidak ditemukan", 
-                                nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                                nama_barang,
-                                tanggal_faktur  
-                            ])
-                            total_nama_barang_extracted += 1
-    
-    if total_nama_barang_detected != total_nama_barang_extracted:
-        st.warning(f"Perbedaan jumlah data: Ditemukan {total_nama_barang_detected} baris nama barang, tetapi hanya {total_nama_barang_extracted} berhasil diekstrak.")
-    
+                        item = [
+                            no_fp if no_fp else "Tidak ditemukan", 
+                            nama_penjual if nama_penjual else "Tidak ditemukan", 
+                            nama_pembeli if nama_pembeli else "Tidak ditemukan", 
+                            nama_barang, harga, unit, qty, total, dpp, ppn, 
+                            tanggal_faktur  
+                        ]
+                        data.append(item)
     return data
 
-if __name__ == "__main__":
-    if login_page():
-        st.title("Konversi Faktur Pajak PDF ke Excel")
-        uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
+def main_app():
+    st.title("Konversi Faktur Pajak PDF ke Excel")
+    uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
+    
+    if uploaded_files:
+        all_data = []
+        for uploaded_file in uploaded_files:
+            tanggal_faktur = "2025-01-09"  # Placeholder untuk tanggal faktur
+            detected_item_count = count_items_in_pdf(uploaded_file)
+            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur)
+            extracted_item_count = len(extracted_data)
+            
+            if detected_item_count != extracted_item_count:
+                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
+            
+            if extracted_data:
+                all_data.extend(extracted_data)
         
-        if uploaded_files:
-            all_data = []
-            file_dict = {file.name: file for file in uploaded_files}
-            selected_files = st.multiselect("Pilih file yang ingin dihapus", list(file_dict.keys()))
+        if all_data:
+            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "DPP", "PPN", "Tanggal Faktur"])
+            df.index = df.index + 1  
             
-            if st.button("Hapus File yang Dipilih"):
-                for file_name in selected_files:
-                    del file_dict[file_name]
-                uploaded_files = list(file_dict.values())
-                st.rerun()
+            st.write("### Pratinjau Data yang Diekstrak")
+            st.dataframe(df)
             
-            for uploaded_file in uploaded_files:
-                tanggal_faktur = "2025-02-18"  # Contoh, bisa diubah sesuai ekstraksi tanggal faktur
-                extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur)
-                if extracted_data:
-                    all_data.extend(extracted_data)
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
+            output.seek(0)
             
-            if all_data:
-                df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Tanggal Faktur"])
-                df.index = df.index + 1  
-                
-                st.write("### Pratinjau Data yang Diekstrak")
-                st.dataframe(df)
-                
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
-                output.seek(0)
-                
-                st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            else:
-                st.error("Gagal mengekstrak data. Pastikan format faktur sesuai.")
+            st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        else:
+            st.error("Gagal mengekstrak data. Pastikan format faktur sesuai.")
+
+if __name__ == "__main__":
+    main_app()
