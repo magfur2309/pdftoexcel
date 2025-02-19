@@ -37,7 +37,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
             table = page.extract_table()
             if table:
                 for row in table:
-                    if len(row) >= 4 and row[0].isdigit():
+                    if len(row) >= 6 and row[0] and row[0].isdigit():
                         nama_barang = " ".join(row[2].split("\n")).strip()
                         
                         try:
@@ -46,7 +46,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur):
                         except ValueError:
                             harga, qty = 0, 0
                         
-                        unit = row[5] if len(row) > 5 else "Unknown"
+                        unit = row[5] if len(row) > 5 and row[5] else "Unknown"
                         total = harga * qty
                         dpp = total / 1.11
                         ppn = total - dpp
