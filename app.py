@@ -6,13 +6,18 @@ import re
 
 def find_invoice_date(pdf_file):
     """Mencari tanggal faktur dalam PDF, mulai dari halaman pertama."""
+    month_map = {
+        "Januari": "01", "Februari": "02", "Maret": "03", "April": "04", "Mei": "05", "Juni": "06", 
+        "Juli": "07", "Agustus": "08", "September": "09", "Oktober": "10", "November": "11", "Desember": "12"
+    }
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
             text = page.extract_text()
             if text:
                 date_match = re.search(r'(\d{1,2})\s*(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s*(\d{4})', text, re.IGNORECASE)
                 if date_match:
-                    return f"{date_match.group(1)} {date_match.group(2)} {date_match.group(3)}"
+                    day, month, year = date_match.groups()
+                    return f"{day.zfill(2)}/{month_map[month]}/{year}"
     return "Tidak ditemukan"
 
 def count_items_in_pdf(pdf_file):
