@@ -13,8 +13,8 @@ def login_page():
     
     if st.button("Login"):
         if (username == "admin" and password == "admin") or (username == "demo" and password == "123456"):
-            st.success("Login successful!")
-            main_app()
+            st.session_state["logged_in"] = True
+            st.rerun()
         else:
             st.error("Invalid username or password")
 
@@ -64,4 +64,10 @@ def main_app():
             st.error("Gagal mengekstrak data. Pastikan format faktur sesuai.")
 
 if __name__ == "__main__":
-    login_page()
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+    
+    if st.session_state["logged_in"]:
+        main_app()
+    else:
+        login_page()
