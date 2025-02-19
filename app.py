@@ -75,7 +75,7 @@ def main_app():
             extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur)
             extracted_item_count = len(extracted_data)
             
-            if detected_item_count != extracted_item_count and detected_item_count > 0:
+            if detected_item_count != extracted_item_count:
                 st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
             
             if extracted_data:
