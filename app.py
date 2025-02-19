@@ -51,6 +51,25 @@ def find_invoice_date(pdf_file):
                     return f"{day.zfill(2)}/{month_map[month]}/{year}"
     return "Tidak ditemukan"
 
+def count_items_in_pdf(pdf_file):
+    item_count = 0
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                matches = re.findall(r'^(\d{1,3})\s+000000', text, re.MULTILINE)
+                item_count += len(matches)
+    return item_count
+
+def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
+    data = []
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                data.append([text, tanggal_faktur])
+    return data
+
 def faktur_pajak_app():
     st.title("Konversi Faktur Pajak PDF ke Excel")
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
@@ -59,10 +78,12 @@ def faktur_pajak_app():
         all_data = []
         for uploaded_file in uploaded_files:
             tanggal_faktur = find_invoice_date(uploaded_file)
-            # Fungsi lain seperti extract_data_from_pdf bisa ditambahkan di sini
+            detected_item_count = count_items_in_pdf(uploaded_file)
+            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
+            all_data.extend(extracted_data)
         
         if all_data:
-            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "Potongan Harga", "DPP", "PPN", "Tanggal Faktur"])
+            df = pd.DataFrame(all_data, columns=["Data", "Tanggal Faktur"])
             df.index = df.index + 1  
             
             st.write("### Pratinjau Data yang Diekstrak")
