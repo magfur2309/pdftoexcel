@@ -62,6 +62,11 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                             continue
                         
                         nama_barang = " ".join(row[2].split("\n")).strip()
+                        nama_barang = re.sub(r'Rp [\d.,]+ x [\d.,]+ \w+', '', nama_barang)
+                        nama_barang = re.sub(r'Potongan Harga = Rp [\d.,]+', '', nama_barang)
+                        nama_barang = re.sub(r'PPnBM \(\d+,?\d*%\) = Rp [\d.,]+', '', nama_barang)
+                        nama_barang = nama_barang.strip()
+                        
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
                         if harga_qty_info:
                             harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
