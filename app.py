@@ -37,6 +37,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
     item_counter = 0
     
     with pdfplumber.open(pdf_file) as pdf:
+        previous_row = None
         for page in pdf.pages:
             text = page.extract_text()
             if text:
@@ -57,11 +58,35 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
             if table:
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
+                        if previous_row and row[0] == "":
+                            previous_row[3] += " " + " ".join(row[2].split("\n")).strip()
+                            continue
+                        
                         nama_barang = " ".join(row[2].split("\n")).strip()
-                        qty, unit, harga, potongan_harga, total, dpp, ppn = 0, "Unknown", 0, 0, 0, 0, 0
+                        nama_barang = re.sub(r'Rp [\d.,]+ x [\d.,]+ \w+', '', nama_barang)
+                        nama_barang = re.sub(r'PPnBM \(\d+,?\d*%\) = Rp [\d.,]+', '', nama_barang)
+                        nama_barang = re.sub(r'Potongan Harga = Rp [\d.,]+', '', nama_barang).strip()
+                        
+                        potongan_harga_match = re.search(r'Potongan Harga\s*=\s*Rp\s*([\d.,]+)', row[2])
+                        potongan_harga = int(float(potongan_harga_match.group(1).replace('.', '').replace(',', '.'))) if potongan_harga_match else 0
+                        
+                        harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
+                        if harga_qty_info:
+                            harga = int(float(harga_qty_info.group(1).replace('.', '').replace(',', '.')))
+                            qty = int(float(harga_qty_info.group(2).replace('.', '').replace(',', '.')))
+                            unit = harga_qty_info.group(3)
+                        else:
+                            harga, qty, unit = 0, 0, "Unknown"
+                        
+                        total = (harga * qty) - potongan_harga
+                        potongan_harga = min(potongan_harga, total)
+                        
+                        ppn = round(total * 0.11, 2)
+                        dpp = total - ppn
                         
                         item = [no_fp if no_fp else "Tidak ditemukan", nama_penjual if nama_penjual else "Tidak ditemukan", nama_pembeli if nama_pembeli else "Tidak ditemukan", tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
                         data.append(item)
+                        previous_row = item
                         item_counter += 1
                         
                         if item_counter >= expected_item_count:
