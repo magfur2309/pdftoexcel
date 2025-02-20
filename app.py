@@ -56,9 +56,15 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
             table = page.extract_table()
             if table:
                 for row in table:
-                    if len(row) >= 4 and row[0].isdigit():
+                    if len(row) >= 7 and row[0].isdigit():
                         nama_barang = " ".join(row[2].split("\n")).strip()
-                        qty, unit, harga, potongan_harga, total, dpp, ppn = 0, "Unknown", 0, 0, 0, 0, 0
+                        qty = int(re.sub(r'[^\d]', '', row[3]) or "0")
+                        unit = row[4].strip() if row[4] else "Unknown"
+                        harga = int(re.sub(r'[^\d]', '', row[5]) or "0")
+                        potongan_harga = int(re.sub(r'[^\d]', '', row[6]) or "0")
+                        total = int(re.sub(r'[^\d]', '', row[7]) or "0")
+                        dpp = int(re.sub(r'[^\d]', '', row[8]) or "0") if len(row) > 8 else 0
+                        ppn = int(re.sub(r'[^\d]', '', row[9]) or "0") if len(row) > 9 else 0
                         
                         item = [no_fp if no_fp else "Tidak ditemukan", nama_penjual if nama_penjual else "Tidak ditemukan", nama_pembeli if nama_pembeli else "Tidak ditemukan", tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
                         data.append(item)
@@ -68,21 +74,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                             break  
     return data
 
-def login_page():
-    """Menampilkan halaman login."""
-    st.title("Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    
-    if st.button("Login"):
-        if username == "admin" and password == "password123":  # Ganti dengan metode autentikasi yang lebih aman
-            st.session_state["logged_in"] = True
-            st.rerun()
-        else:
-            st.error("Username atau password salah")
-
 def main_app():
-    """Aplikasi utama setelah login."""
     st.title("Konversi Faktur Pajak PDF ke Excel")
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
     
@@ -120,10 +112,4 @@ def main_app():
             st.error("Gagal mengekstrak data. Pastikan format faktur sesuai.")
 
 if __name__ == "__main__":
-    if "logged_in" not in st.session_state:
-        st.session_state["logged_in"] = False
-    
-    if not st.session_state["logged_in"]:
-        login_page()
-    else:
-        main_app()
+    main_app()
