@@ -31,6 +31,13 @@ def count_items_in_pdf(pdf_file):
                 item_count += len(matches)
     return item_count
 
+def clean_nama_barang(nama_barang):
+    """Membersihkan informasi harga, jumlah, dan pajak dari kolom Nama Barang."""
+    nama_barang = re.sub(r'Rp\s[\d.,]+(?:\sx\s[\d.,]+\s\w+)?', '', nama_barang)  # Hapus harga & jumlah
+    nama_barang = re.sub(r'Potongan Harga\s*=\s*Rp\s[\d.,]+', '', nama_barang)  # Hapus potongan harga
+    nama_barang = re.sub(r'PPnBM\s*\([\d.,]+%\)\s*=\s*Rp\s[\d.,]+', '', nama_barang)  # Hapus PPnBM
+    return nama_barang.strip()
+
 def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
@@ -57,7 +64,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
             if table:
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
-                        nama_barang = " ".join(row[2].split("\n")).strip()
+                        nama_barang = clean_nama_barang(" ".join(row[2].split("\n")).strip())
                         qty, unit, harga, potongan_harga, total, dpp, ppn = 0, "Unknown", 0, 0, 0, 0, 0
                         
                         item = [no_fp if no_fp else "Tidak ditemukan", nama_penjual if nama_penjual else "Tidak ditemukan", nama_pembeli if nama_pembeli else "Tidak ditemukan", tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
@@ -67,19 +74,6 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                         if item_counter >= expected_item_count:
                             break  
     return data
-
-def login_page():
-    """Menampilkan halaman login."""
-    st.title("Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    
-    if st.button("Login"):
-        if username == "admin" and password == "password123":  # Ganti dengan metode autentikasi yang lebih aman
-            st.session_state["logged_in"] = True
-            st.rerun()
-        else:
-            st.error("Username atau password salah")
 
 def main_app():
     """Aplikasi utama setelah login."""
@@ -120,10 +114,4 @@ def main_app():
             st.error("Gagal mengekstrak data. Pastikan format faktur sesuai.")
 
 if __name__ == "__main__":
-    if "logged_in" not in st.session_state:
-        st.session_state["logged_in"] = False
-    
-    if not st.session_state["logged_in"]:
-        login_page()
-    else:
-        main_app()
+    main_app()
