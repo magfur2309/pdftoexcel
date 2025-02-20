@@ -45,16 +45,17 @@ def find_invoice_date(pdf_file):
                     return f"{day.zfill(2)}/{month_map[month]}/{year}"
     return "Tidak ditemukan"
 
-def count_items_in_pdf(pdf_file):
-    """Menghitung jumlah item dalam PDF berdasarkan pola nomor urut."""
-    item_count = 0
+def extract_invoice_items(pdf_file):
+    """Ekstrak data faktur dari PDF."""
+    items = []
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
             text = page.extract_text()
             if text:
-                matches = re.findall(r'^(\d{1,3})\s+000000', text, re.MULTILINE)
-                item_count += len(matches)
-    return item_count
+                item_matches = re.findall(r'^(\d{1,3})\s+([A-Za-z0-9 ]+)\s+(\d+)\s+([A-Za-z]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)', text, re.MULTILINE)
+                for match in item_matches:
+                    items.append(match)
+    return items
 
 def main_app():
     st.title("Konversi Faktur Pajak PDF ke Excel")
@@ -64,19 +65,16 @@ def main_app():
         all_data = []
         for uploaded_file in uploaded_files:
             tanggal_faktur = find_invoice_date(uploaded_file)
-            detected_item_count = count_items_in_pdf(uploaded_file)
-            extracted_data = []  # Simpan data di sini untuk diproses nanti
+            extracted_data = extract_invoice_items(uploaded_file)
             extracted_item_count = len(extracted_data)
             
-            if detected_item_count != extracted_item_count and detected_item_count != 0:
-                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
-            
             if extracted_data:
-                all_data.extend(extracted_data)
-        
+                for item in extracted_data:
+                    all_data.append(["", "", "", tanggal_faktur, *item])
+            
         if all_data:
             df = pd.DataFrame(all_data, columns=[
-                "No FP", "Nama Penjual", "Nama Pembeli", "Tanggal Faktur", "Nama Barang", 
+                "No FP", "Nama Penjual", "Nama Pembeli", "Tanggal Faktur", "No Item", "Nama Barang", 
                 "Qty", "Satuan", "Harga", "Potongan Harga", "Total", "DPP", "PPN"
             ])
             df.index = df.index + 1  # Mulai nomor indeks dari 1
