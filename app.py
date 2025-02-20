@@ -20,21 +20,25 @@ def find_invoice_date(pdf_file):
                     return f"{day.zfill(2)}/{month_map[month]}/{year}"
     return "Tidak ditemukan"
 
-def count_items_in_pdf(pdf_file):
-    """Menghitung jumlah item dalam PDF berdasarkan pola nomor urut."""
-    item_count = 0
-    with pdfplumber.open(pdf_file) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                matches = re.findall(r'^(\d{1,3})\s+000000', text, re.MULTILINE)
-                item_count += len(matches)
-    return item_count
+def extract_table_data(table):
+    """Ekstrak data tabel secara lebih akurat."""
+    data = []
+    for row in table:
+        if len(row) >= 9 and row[0].strip().isdigit():
+            nama_barang = " ".join(row[1].split("\n")).strip() if row[1] else "Unknown"
+            qty = int(row[2].replace(',', '').strip()) if row[2] and row[2].replace(',', '').isdigit() else 0
+            unit = row[3].strip() if row[3] else "Unknown"
+            harga = float(row[4].replace(',', '').strip()) if row[4] and row[4].replace(',', '').replace('.', '').isdigit() else 0
+            potongan_harga = float(row[5].replace(',', '').strip()) if row[5] and row[5].replace(',', '').replace('.', '').isdigit() else 0
+            total = float(row[6].replace(',', '').strip()) if row[6] and row[6].replace(',', '').replace('.', '').isdigit() else 0
+            dpp = float(row[7].replace(',', '').strip()) if row[7] and row[7].replace(',', '').replace('.', '').isdigit() else 0
+            ppn = float(row[8].replace(',', '').strip()) if row[8] and row[8].replace(',', '').replace('.', '').isdigit() else 0
+            data.append([nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn])
+    return data
 
-def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
+def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
-    item_counter = 0
     
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
@@ -55,31 +59,14 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
             
             table = page.extract_table()
             if table:
-                for row in table:
-                    if len(row) >= 4 and row[0].isdigit():
-                        nama_barang = " ".join(row[2].split("\n")).strip()
-                        qty, unit, harga, potongan_harga, total, dpp, ppn = 0, "Unknown", 0, 0, 0, 0, 0
-                        
-                        item = [no_fp if no_fp else "Tidak ditemukan", nama_penjual if nama_penjual else "Tidak ditemukan", nama_pembeli if nama_pembeli else "Tidak ditemukan", tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
-                        data.append(item)
-                        item_counter += 1
-                        
-                        if item_counter >= expected_item_count:
-                            break  
+                items = extract_table_data(table)
+                for item in items:
+                    item.insert(0, no_fp if no_fp else "Tidak ditemukan")
+                    item.insert(1, nama_penjual if nama_penjual else "Tidak ditemukan")
+                    item.insert(2, nama_pembeli if nama_pembeli else "Tidak ditemukan")
+                    item.insert(3, tanggal_faktur)
+                    data.append(item)
     return data
-
-def login_page():
-    """Menampilkan halaman login."""
-    st.title("Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    
-    if st.button("Login"):
-        if username == "admin" and password == "password123":  # Ganti dengan metode autentikasi yang lebih aman
-            st.session_state["logged_in"] = True
-            st.rerun()
-        else:
-            st.error("Username atau password salah")
 
 def main_app():
     """Aplikasi utama setelah login."""
@@ -90,15 +77,8 @@ def main_app():
         all_data = []
         for uploaded_file in uploaded_files:
             tanggal_faktur = find_invoice_date(uploaded_file)
-            detected_item_count = count_items_in_pdf(uploaded_file)
-            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
-            extracted_item_count = len(extracted_data)
-            
-            if detected_item_count != extracted_item_count and detected_item_count != 0:
-                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
-            
-            if extracted_data:
-                all_data.extend(extracted_data)
+            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur)
+            all_data.extend(extracted_data)
         
         if all_data:
             df = pd.DataFrame(all_data, columns=[
