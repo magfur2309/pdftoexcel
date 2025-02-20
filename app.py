@@ -20,21 +20,9 @@ def find_invoice_date(pdf_file):
                     return f"{day.zfill(2)}/{month_map[month]}/{year}"
     return "Tidak ditemukan"
 
-def count_items_in_pdf(pdf_file):
-    """Menghitung jumlah item dalam PDF berdasarkan pola nomor urut."""
-    item_count = 0
-    with pdfplumber.open(pdf_file) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                matches = re.findall(r'^(\d{1,3})\s+000000', text, re.MULTILINE)
-                item_count += len(matches)
-    return item_count
-
-def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
+def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
-    item_counter = 0
     
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
@@ -58,34 +46,17 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                 for row in table:
                     if len(row) >= 7 and row[0].isdigit():
                         nama_barang = " ".join(row[2].split("\n")).strip()
-                        qty = row[3].strip()
-                        unit = row[4].strip()
-                        harga = row[5].strip()
-                        potongan_harga = row[6].strip()
-                        total = row[7].strip() if len(row) > 7 else ""
-                        dpp = row[8].strip() if len(row) > 8 else ""
-                        ppn = row[9].strip() if len(row) > 9 else ""
+                        qty = re.sub(r'[^0-9.,]', '', row[3].strip()) if row[3] else "0"
+                        unit = row[4].strip() if row[4] else "-"
+                        harga = re.sub(r'[^0-9.,]', '', row[5].strip()) if row[5] else "0"
+                        potongan_harga = re.sub(r'[^0-9.,]', '', row[6].strip()) if row[6] else "0"
+                        total = re.sub(r'[^0-9.,]', '', row[7].strip()) if len(row) > 7 and row[7] else "0"
+                        dpp = re.sub(r'[^0-9.,]', '', row[8].strip()) if len(row) > 8 and row[8] else "0"
+                        ppn = re.sub(r'[^0-9.,]', '', row[9].strip()) if len(row) > 9 and row[9] else "0"
                         
-                        item = [no_fp if no_fp else "Tidak ditemukan", nama_penjual if nama_penjual else "Tidak ditemukan", nama_pembeli if nama_pembeli else "Tidak ditemukan", tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
+                        item = [no_fp or "Tidak ditemukan", nama_penjual or "Tidak ditemukan", nama_pembeli or "Tidak ditemukan", tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
                         data.append(item)
-                        item_counter += 1
-                        
-                        if item_counter >= expected_item_count:
-                            break  
     return data
-
-def login_page():
-    """Menampilkan halaman login."""
-    st.title("Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    
-    if st.button("Login"):
-        if username == "admin" and password == "password123":  # Ganti dengan metode autentikasi yang lebih aman
-            st.session_state["logged_in"] = True
-            st.rerun()
-        else:
-            st.error("Username atau password salah")
 
 def main_app():
     """Aplikasi utama setelah login."""
@@ -96,12 +67,7 @@ def main_app():
         all_data = []
         for uploaded_file in uploaded_files:
             tanggal_faktur = find_invoice_date(uploaded_file)
-            detected_item_count = count_items_in_pdf(uploaded_file)
-            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
-            extracted_item_count = len(extracted_data)
-            
-            if detected_item_count != extracted_item_count and detected_item_count != 0:
-                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
+            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur)
             
             if extracted_data:
                 all_data.extend(extracted_data)
