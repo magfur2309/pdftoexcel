@@ -25,64 +25,33 @@ def count_items_in_pdf(pdf_file):
     item_count = 0
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                matches = re.findall(r'^(\d{1,3})\s+000000', text, re.MULTILINE)
-                item_count += len(matches)
+            table = page.extract_table()
+            if table:
+                item_count += sum(1 for row in table if row and row[0].isdigit())
     return item_count
 
-def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
+def extract_data_from_pdf(pdf_file, tanggal_faktur):
     data = []
-    no_fp, nama_penjual, nama_pembeli = None, None, None
-    item_counter = 0
-    
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                no_fp_match = re.search(r'Kode dan Nomor Seri Faktur Pajak:\s*(\d+)', text)
-                if no_fp_match:
-                    no_fp = no_fp_match.group(1)
-                
-                penjual_match = re.search(r'Nama\s*:\s*([\w\s\-.,&()]+)\nAlamat', text)
-                if penjual_match:
-                    nama_penjual = penjual_match.group(1).strip()
-                
-                pembeli_match = re.search(r'Pembeli Barang Kena Pajak/Penerima Jasa Kena Pajak:\s*Nama\s*:\s*([\w\s\-.,&()]+)\nAlamat', text)
-                if pembeli_match:
-                    nama_pembeli = pembeli_match.group(1).strip()
-                    nama_pembeli = re.sub(r'\bAlamat\b', '', nama_pembeli, flags=re.IGNORECASE).strip()
-            
             table = page.extract_table()
             if table:
                 for row in table:
-                    if len(row) >= 4 and row[0].isdigit():
+                    if len(row) >= 7 and row[0].isdigit():
                         nama_barang = " ".join(row[2].split("\n")).strip()
-                        qty, unit, harga, potongan_harga, total, dpp, ppn = 0, "Unknown", 0, 0, 0, 0, 0
+                        qty = int(re.sub(r'[^\d]', '', row[3]) or "0")
+                        unit = row[4].strip() if row[4] else "Unknown"
+                        harga = int(re.sub(r'[^\d]', '', row[5]) or "0")
+                        potongan_harga = int(re.sub(r'[^\d]', '', row[6]) or "0")
+                        total = int(re.sub(r'[^\d]', '', row[7]) or "0")
+                        dpp = int(re.sub(r'[^\d]', '', row[8]) or "0") if len(row) > 8 else 0
+                        ppn = int(re.sub(r'[^\d]', '', row[9]) or "0") if len(row) > 9 else 0
                         
-                        item = [no_fp if no_fp else "Tidak ditemukan", nama_penjual if nama_penjual else "Tidak ditemukan", nama_pembeli if nama_pembeli else "Tidak ditemukan", tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
+                        item = [tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
                         data.append(item)
-                        item_counter += 1
-                        
-                        if item_counter >= expected_item_count:
-                            break  
     return data
 
-def login_page():
-    """Menampilkan halaman login."""
-    st.title("Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    
-    if st.button("Login"):
-        if username == "admin" and password == "password123":  # Ganti dengan metode autentikasi yang lebih aman
-            st.session_state["logged_in"] = True
-            st.rerun()
-        else:
-            st.error("Username atau password salah")
-
 def main_app():
-    """Aplikasi utama setelah login."""
     st.title("Konversi Faktur Pajak PDF ke Excel")
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
     
@@ -91,19 +60,16 @@ def main_app():
         for uploaded_file in uploaded_files:
             tanggal_faktur = find_invoice_date(uploaded_file)
             detected_item_count = count_items_in_pdf(uploaded_file)
-            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
-            extracted_item_count = len(extracted_data)
+            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur)
             
-            if detected_item_count != extracted_item_count and detected_item_count != 0:
-                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
+            if len(extracted_data) != detected_item_count:
+                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {len(extracted_data)}")
             
-            if extracted_data:
-                all_data.extend(extracted_data)
+            all_data.extend(extracted_data)
         
         if all_data:
             df = pd.DataFrame(all_data, columns=[
-                "No FP", "Nama Penjual", "Nama Pembeli", "Tanggal Faktur", "Nama Barang", 
-                "Qty", "Satuan", "Harga", "Potongan Harga", "Total", "DPP", "PPN"
+                "Tanggal Faktur", "Nama Barang", "Qty", "Satuan", "Harga", "Potongan Harga", "Total", "DPP", "PPN"
             ])
             df.index = df.index + 1  
             
@@ -120,10 +86,4 @@ def main_app():
             st.error("Gagal mengekstrak data. Pastikan format faktur sesuai.")
 
 if __name__ == "__main__":
-    if "logged_in" not in st.session_state:
-        st.session_state["logged_in"] = False
-    
-    if not st.session_state["logged_in"]:
-        login_page()
-    else:
-        main_app()
+    main_app()
