@@ -4,6 +4,22 @@ import pdfplumber
 import io
 import re
 
+def find_invoice_date(pdf_file):
+    """Mencari tanggal faktur dalam PDF, mulai dari halaman pertama."""
+    month_map = {
+        "Januari": "01", "Februari": "02", "Maret": "03", "April": "04", "Mei": "05", "Juni": "06", 
+        "Juli": "07", "Agustus": "08", "September": "09", "Oktober": "10", "November": "11", "Desember": "12"
+    }
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                date_match = re.search(r'(\d{1,2})\s*(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s*(\d{4})', text, re.IGNORECASE)
+                if date_match:
+                    day, month, year = date_match.groups()
+                    return f"{day.zfill(2)}/{month_map[month]}/{year}"
+    return "Tidak ditemukan"
+
 def extract_numeric(value):
     """Membersihkan dan mengonversi nilai numerik dari string."""
     value = re.sub(r'[^0-9,.-]', '', value)  # Hanya mempertahankan angka, koma, titik, dan minus
@@ -13,10 +29,11 @@ def extract_numeric(value):
     except ValueError:
         return 0  # Default jika gagal konversi
 
-def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
+def extract_data_from_pdf(pdf_file, expected_item_count):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
     item_counter = 0
+    tanggal_faktur = find_invoice_date(pdf_file)
     
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
@@ -58,7 +75,6 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                         if item_counter >= expected_item_count:
                             break  
     return data
-
 
 def login_page():
     """Menampilkan halaman login."""
