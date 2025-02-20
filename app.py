@@ -108,7 +108,7 @@ def login_page():
 
 def main_app():
     """Aplikasi utama setelah login."""
-    st.title("Konversi Faktur Pajak PDF ke Excel")
+    st.title("Konversi Faktur Pajak PDF To Ms Excel")
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
     
     if uploaded_files:
