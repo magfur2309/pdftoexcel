@@ -4,17 +4,6 @@ import pdfplumber
 import io
 import re
 
-def login():
-    """Fungsi untuk menangani login saat pengguna menekan Enter."""
-    username = st.session_state.get("username", "")
-    password = st.session_state.get("password", "")
-    
-    if username == "admin" and password == "1234":
-        st.session_state["authenticated"] = True
-    else:
-        st.session_state["authenticated"] = False
-        st.warning("Username atau password salah!")
-
 def find_invoice_date(pdf_file):
     """Mencari tanggal faktur dalam PDF, mulai dari halaman pertama."""
     month_map = {
@@ -104,31 +93,62 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                             break  
     return data
 
-def main():
-    st.title("Invoice Extractor App")
+def login_page():
+    """Menampilkan halaman login."""
+    st.title("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
     
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
+    if st.button("Login"):
+        if username == "admin" and password == "password123":  # Ganti dengan metode autentikasi yang lebih aman
+            st.session_state["logged_in"] = True
+            st.rerun()
+        else:
+            st.error("Username atau password salah")
+
+def main_app():
+    """Aplikasi utama setelah login."""
+    st.title("Konversi Faktur Pajak PDF To Ms Excel")
+    uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
     
-    if not st.session_state["authenticated"]:
-        st.text_input("Username", key="username", on_change=login)
-        st.text_input("Password", type="password", key="password", on_change=login)
-        return
-    
-    st.success("Login berhasil!")
-    
-    uploaded_file = st.file_uploader("Upload Faktur PDF", type=["pdf"])
-    if uploaded_file is not None:
-        tanggal_faktur = find_invoice_date(uploaded_file)
-        item_count = count_items_in_pdf(uploaded_file)
-        data = extract_data_from_pdf(uploaded_file, tanggal_faktur, item_count)
+    if uploaded_files:
+        all_data = []
+        for uploaded_file in uploaded_files:
+            tanggal_faktur = find_invoice_date(uploaded_file)
+            detected_item_count = count_items_in_pdf(uploaded_file)
+            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
+            extracted_item_count = len(extracted_data)
+            
+            if detected_item_count != extracted_item_count and detected_item_count != 0:
+                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
+            
+            if extracted_data:
+                all_data.extend(extracted_data)
         
-        df = pd.DataFrame(data, columns=[
-            "No FP", "Penjual", "Pembeli", "Tanggal Faktur", "Nama Barang", "Qty", "Unit", "Harga", "Potongan", "Total", "DPP", "PPN"
-        ])
-        
-        st.write(df)
-        st.download_button("Download Excel", data=io.BytesIO(df.to_csv(index=False).encode()), file_name="invoice_data.csv", mime="text/csv")
+        if all_data:
+            df = pd.DataFrame(all_data, columns=[
+                "No FP", "Nama Penjual", "Nama Pembeli", "Tanggal Faktur", "Nama Barang", 
+                "Qty", "Satuan", "Harga", "Potongan Harga", "Total", "DPP", "PPN"
+            ])
+            df.index = df.index + 1  
+            
+            st.write("### Pratinjau Data yang Diekstrak")
+            st.dataframe(df)
+            
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
+            output.seek(0)
+            
+            st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        else:
+            st.error("Gagal mengekstrak data. Pastikan format faktur sesuai.")
 
 if __name__ == "__main__":
-    main()
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+    
+    if not st.session_state["logged_in"]:
+        login_page()
+    else:
+        main_app()
