@@ -95,7 +95,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
 
 def login_page():
     """Menampilkan halaman login."""
-    st.title("Login")
+    st.title("Login Konversi Faktur Pajak")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     
@@ -108,7 +108,7 @@ def login_page():
 
 def main_app():
     """Aplikasi utama setelah login."""
-    st.title("Konversi Faktur Pajak PDF To Ms Excel")
+    st.title("Konversi Faktur Pajak PDF To Excel")
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
     
     if uploaded_files:
