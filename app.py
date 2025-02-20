@@ -112,13 +112,10 @@ def main_app():
                 st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             with col2:
                 if st.button("\U0001F5A5 Log Out"):
-                    st.session_state["logged_in"] = False
+                    st.session_state.clear()
                     st.experimental_rerun()
 
 if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
+    st.session_state["logged_in"] = True
 
-if not st.session_state["logged_in"]:
-    login_page()
-else:
-    main_app()
+main_app()
