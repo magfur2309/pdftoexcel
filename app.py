@@ -57,10 +57,12 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                 for row in table:
                     if len(row) >= 4 and row[0].isdigit():
                         nama_barang = " ".join(row[2].split("\n")).strip()
-                        nama_barang = re.sub(r'Rp [\d.,]+ x [\d.,]+ \w+', '', nama_barang)
-                        nama_barang = re.sub(r'Potongan Harga\s*=\s*Rp\s*[\d.,]+', '', nama_barang)
-                        nama_barang = re.sub(r'PPnBM\s*\([\d.,]+%\)\s*=\s*Rp\s*[\d.,]+', '', nama_barang)
-                        nama_barang = nama_barang.strip()
+                        
+                        # **Hapus informasi harga dan potongan dari nama barang**
+                        nama_barang = re.sub(r'Rp [\d.,]+ x [\d.,]+ \w+', '', nama_barang)  # Hapus harga & jumlah
+                        nama_barang = re.sub(r'Potongan Harga\s*=\s*Rp\s*[\d.,]+', '', nama_barang)  # Hapus potongan harga
+                        nama_barang = re.sub(r'PPnBM\s*\([\d.,]+%\)\s*=\s*Rp\s*[\d.,]+', '', nama_barang)  # Hapus PPnBM
+                        nama_barang = nama_barang.strip()  # Bersihkan spasi ekstra
 
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
                         if harga_qty_info:
@@ -85,6 +87,31 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                             break  
     return data
 
+
+def login_page():
+    users = {
+        "user1": hashlib.sha256("ijfugroup1".encode()).hexdigest(),
+        "user2": hashlib.sha256("ijfugroup2".encode()).hexdigest(),
+        "user3": hashlib.sha256("ijfugroup3".encode()).hexdigest(),
+        "user4": hashlib.sha256("ijfugroup4".encode()).hexdigest()
+    }
+    
+    st.title("Login Convert PDF FP To Excel")
+
+    with st.form("login_form"):
+        username = st.text_input("Username", placeholder="Masukkan username Anda")
+        password = st.text_input("Password", type="password", placeholder="Masukkan password Anda")
+        submit_button = st.form_submit_button("Login")
+
+    if submit_button:
+        if username in users and hashlib.sha256(password.encode()).hexdigest() == users[username]:
+            st.session_state["logged_in"] = True
+            st.session_state["username"] = username
+            st.success("Login berhasil! Selamat Datang Member ijfugroup")
+        else:
+            st.error("Username atau password salah")
+
+
 def main_app():
     st.title("Convert Faktur Pajak PDF To Excel")
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
@@ -95,7 +122,13 @@ def main_app():
             tanggal_faktur = find_invoice_date(uploaded_file)
             detected_item_count = count_items_in_pdf(uploaded_file)
             extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
-            all_data.extend(extracted_data)
+            extracted_item_count = len(extracted_data)
+            
+            if detected_item_count != extracted_item_count and detected_item_count != 0:
+                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
+            
+            if extracted_data:
+                all_data.extend(extracted_data)
         
         if all_data:
             df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Tanggal Faktur", "Nama Barang", "Qty", "Satuan", "Harga", "Potongan Harga", "Total", "DPP", "PPN"])
@@ -106,16 +139,12 @@ def main_app():
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
             output.seek(0)
-            
-            col1, col2 = st.columns([8, 2])
-            with col1:
-                st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            with col2:
-                if st.button("\U0001F5A5 Log Out"):
-                    st.session_state.clear()
-                    st.experimental_rerun()
+            st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = True
+    st.session_state["logged_in"] = False
 
-main_app()
+if not st.session_state["logged_in"]:
+    login_page()
+else:
+    main_app()
