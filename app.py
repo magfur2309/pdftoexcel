@@ -20,20 +20,21 @@ def find_invoice_date(pdf_file):
                     return f"{day.zfill(2)}/{month_map[month]}/{year}"
     return "Tidak ditemukan"
 
-def extract_numeric(value):
-    """Membersihkan dan mengonversi nilai numerik dari string."""
-    value = re.sub(r'[^0-9,.-]', '', value)  # Hanya mempertahankan angka, koma, titik, dan minus
-    value = value.replace(',', '.')  # Mengganti koma desimal ke titik
-    try:
-        return float(value)
-    except ValueError:
-        return 0  # Default jika gagal konversi
+def count_items_in_pdf(pdf_file):
+    """Menghitung jumlah item dalam PDF berdasarkan pola nomor urut."""
+    item_count = 0
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                matches = re.findall(r'^(\d{1,3})\s+000000', text, re.MULTILINE)
+                item_count += len(matches)
+    return item_count
 
-def extract_data_from_pdf(pdf_file, expected_item_count):
+def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
     data = []
     no_fp, nama_penjual, nama_pembeli = None, None, None
     item_counter = 0
-    tanggal_faktur = find_invoice_date(pdf_file)
     
     with pdfplumber.open(pdf_file) as pdf:
         for page in pdf.pages:
@@ -55,20 +56,11 @@ def extract_data_from_pdf(pdf_file, expected_item_count):
             table = page.extract_table()
             if table:
                 for row in table:
-                    if len(row) >= 6 and row[0].isdigit():  # Memastikan ada data yang cukup
+                    if len(row) >= 4 and row[0].isdigit():
                         nama_barang = " ".join(row[2].split("\n")).strip()
-                        qty = extract_numeric(row[3])
-                        unit = row[4] if row[4] else "Unknown"
-                        harga = extract_numeric(row[5])
-                        potongan_harga = extract_numeric(row[6]) if len(row) > 6 else 0
-                        total = extract_numeric(row[7]) if len(row) > 7 else 0
-                        dpp = extract_numeric(row[8]) if len(row) > 8 else 0
-                        ppn = extract_numeric(row[9]) if len(row) > 9 else 0
+                        qty, unit, harga, potongan_harga, total, dpp, ppn = 0, "Unknown", 0, 0, 0, 0, 0
                         
-                        item = [no_fp if no_fp else "Tidak ditemukan", 
-                                nama_penjual if nama_penjual else "Tidak ditemukan", 
-                                nama_pembeli if nama_pembeli else "Tidak ditemukan", 
-                                tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
+                        item = [no_fp if no_fp else "Tidak ditemukan", nama_penjual if nama_penjual else "Tidak ditemukan", nama_pembeli if nama_pembeli else "Tidak ditemukan", tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
                         data.append(item)
                         item_counter += 1
                         
