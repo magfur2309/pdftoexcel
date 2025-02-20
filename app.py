@@ -56,15 +56,9 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
             table = page.extract_table()
             if table:
                 for row in table:
-                    if len(row) >= 7 and row[0].isdigit():
+                    if len(row) >= 4 and row[0].isdigit():
                         nama_barang = " ".join(row[2].split("\n")).strip()
-                        qty = row[3].strip()
-                        unit = row[4].strip()
-                        harga = row[5].strip()
-                        potongan_harga = row[6].strip()
-                        total = row[7].strip() if len(row) > 7 else ""
-                        dpp = row[8].strip() if len(row) > 8 else ""
-                        ppn = row[9].strip() if len(row) > 9 else ""
+                        qty, unit, harga, potongan_harga, total, dpp, ppn = 0, "Unknown", 0, 0, 0, 0, 0
                         
                         item = [no_fp if no_fp else "Tidak ditemukan", nama_penjual if nama_penjual else "Tidak ditemukan", nama_pembeli if nama_pembeli else "Tidak ditemukan", tanggal_faktur, nama_barang, qty, unit, harga, potongan_harga, total, dpp, ppn]
                         data.append(item)
