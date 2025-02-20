@@ -4,6 +4,7 @@ import pdfplumber
 import io
 import re
 import hashlib
+import datetime
 
 def find_invoice_date(pdf_file):
     month_map = {
@@ -97,34 +98,34 @@ def login_page():
 
 def main_app():
     st.title("Convert Faktur Pajak PDF To Excel")
-    uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
+    username = st.session_state.get("username", "")
+    today = datetime.date.today().isoformat()
+    
+    if "upload_history" not in st.session_state:
+        st.session_state["upload_history"] = {}
+    
+    user_uploads = st.session_state["upload_history"].get(username, {})
+    
+    if username != "admin" and user_uploads.get("date") == today:
+        st.warning("Anda hanya dapat mengunggah 1 file PDF per hari.")
+        return
+    
+    uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=(username == "admin"))
     
     if uploaded_files:
+        st.session_state["upload_history"][username] = {"date": today}
         all_data = []
         for uploaded_file in uploaded_files:
             tanggal_faktur = find_invoice_date(uploaded_file)
             detected_item_count = count_items_in_pdf(uploaded_file)
             extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
-            extracted_item_count = len(extracted_data)
-            
             if extracted_data:
                 all_data.extend(extracted_data)
         
         if all_data:
             df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Tanggal Faktur", "Nama Barang"])
-            df.index = df.index + 1  
-
-            if st.session_state.get("username") != "admin":
-                df = df.iloc[:20]
-
             st.write("### Pratinjau Data yang Diekstrak")
             st.dataframe(df)
-
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
-            output.seek(0)
-            st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
