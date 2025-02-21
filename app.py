@@ -5,6 +5,7 @@ import io
 import re
 import hashlib
 import base64
+
 from datetime import date
 
 def find_invoice_date(pdf_file):
@@ -113,9 +114,10 @@ def main_app():
             df.index = df.index + 1  
             st.write("### Pratinjau Data yang Diekstrak")
             st.dataframe(df)
-            csv_data = df.to_csv(index=False)
-            b64 = base64.b64encode(csv_data.encode()).decode()
-            st.download_button(label="📥 Unduh CSV", data=b64, file_name="Faktur_Pajak.csv", mime="text/csv")
+            csv_data = io.StringIO()
+            df.to_csv(csv_data, index=False)
+            csv_data.seek(0)
+            st.download_button(label="📥 Unduh CSV", data=csv_data, file_name="Faktur_Pajak.csv", mime="text/csv")
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
