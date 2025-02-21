@@ -107,7 +107,7 @@ def login_page():
         if username in users and hashlib.sha256(password.encode()).hexdigest() == users[username]:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
-            st.success("Login berhasil! Selamat Datang Member ijfugroup")
+            st.success("Login berhasil! Selamat Datang!")
         else:
             st.error("Username atau password salah")
 
