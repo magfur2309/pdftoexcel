@@ -5,47 +5,6 @@ import io
 import re
 import hashlib
 import datetime
-# ... (your existing code)
-
-def login_page():
-    # ... (your existing code)
-
-def main_app():
-    st.title("Convert Faktur Pajak PDF To Excel")
-
-    # Check if the user is logged in
-    if "logged_in" not in st.session_state or not st.session_state["logged_in"]:
-        st.error("Anda harus login terlebih dahulu.")
-        return
-
-    # Get the current date
-    today = datetime.date.today()
-
-    # Check if the user has exceeded the upload limit for today
-    if "upload_count" not in st.session_state:
-        st.session_state["upload_count"] = 0
-    elif st.session_state["upload_count"] >= 15 and today == st.session_state["last_upload_date"]:
-        st.error("Anda telah mencapai batas upload maksimal untuk hari ini (15 file).")
-        return
-
-    # ... (your existing code)
-
-    if uploaded_files:
-        # Update the upload count and last upload date
-        st.session_state["upload_count"] += len(uploaded_files)
-        st.session_state["last_upload_date"] = today
-
-        # ... (your existing code)
-
-# ... (your existing code)
-
-if __name__ == "__main__":
-    if "logged_in" not in st.session_state:
-        st.session_state["logged_in"] = False
-    if st.session_state["logged_in"]:
-        main_app()
-    else:
-        login_page()
 
 def find_invoice_date(pdf_file):
     month_map = {
@@ -100,10 +59,10 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
                     if len(row) >= 4 and row[0].isdigit():
                         nama_barang = " ".join(row[2].split("\n")).strip()
                         
-                        # **Hapus informasi harga dan potongan dari nama barang**
+                        # Hapus informasi harga dan potongan dari nama barang
                         nama_barang = re.sub(r'Rp [\d.,]+ x [\d.,]+ \w+', '', nama_barang)  # Hapus harga & jumlah
                         nama_barang = re.sub(r'Potongan Harga\s*=\s*Rp\s*[\d.,]+', '', nama_barang)  # Hapus potongan harga
-                        nama_barang = re.sub(r'PPnBM\s*\([\d.,]+%\)\s*=\s*Rp\s*[\d.,]+', '', nama_barang)  # Hapus PPnBM
+                        nama_barang = re.sub(r'PPnBM\s*$$[\d.,]+%$$\s*=\s*Rp\s*[\d.,]+', '', nama_barang)  # Hapus PPnBM
                         nama_barang = nama_barang.strip()  # Bersihkan spasi ekstra
 
                         harga_qty_info = re.search(r'Rp ([\d.,]+) x ([\d.,]+) (\w+)', row[2])
@@ -156,6 +115,22 @@ def login_page():
 
 def main_app():
     st.title("Convert Faktur Pajak PDF To Excel")
+
+    # Check if the user is logged in
+    if "logged_in" not in st.session_state or not st.session_state["logged_in"]:
+        st.error("Anda harus login terlebih dahulu.")
+        return
+
+    # Get the current date
+    today = datetime.date.today()
+
+    # Check if the user has exceeded the upload limit for today
+    if "upload_count" not in st.session_state:
+        st.session_state["upload_count"] = 0
+    elif st.session_state["upload_count"] >= 15 and today == st.session_state["last_upload_date"]:
+        st.error("Anda telah mencapai batas upload maksimal untuk hari ini (15 file).")
+        return
+
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
     
     if uploaded_files:
@@ -166,27 +141,26 @@ def main_app():
             extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
             extracted_item_count = len(extracted_data)
             
-            if detected_item_count != extracted_item_count and detected_item_count != 0:
-                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
+            # Update the upload count and last upload date
+            st.session_state["upload_count"] += len(uploaded_files)
+            st.session_state["last_upload_date"] = today
+
+            all_data.extend(extracted_data)
             
-            if extracted_data:
-                all_data.extend(extracted_data)
-        
         if all_data:
-            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Tanggal Faktur", "Nama Barang", "Qty", "Satuan", "Harga", "Potongan Harga", "Total", "DPP", "PPN"])
-            df.index = df.index + 1  
-            st.write("### Pratinjau Data yang Diekstrak")
+            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Tanggal Faktur", "Nama Barang", "Qty", "Unit", "Harga Satuan", "Potongan Harga", "Total", "DPP", "PPN"])
             st.dataframe(df)
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
-            output.seek(0)
-            st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            
+            # Download Excel
+            csv = df.to_csv(index=False)
+            b64 = base64.b64encode(csv.encode()).decode()
+            href = f'<a href="data:file/csv;base64,{b64}" download="Faktur Pajak.csv">Download Data Faktur Pajak (CSV)</a>'
+            st.markdown(href, unsafe_allow_html=True)
 
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-
-if not st.session_state["logged_in"]:
-    login_page()
-else:
-    main_app()
+if __name__ == "__main__":
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+    if st.session_state["logged_in"]:
+        main_app()
+    else:
+        login_page()
