@@ -90,10 +90,10 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
 
 def login_page():
     users = {
-        "user1": hashlib.sha256("ijfugroup1".encode()).hexdigest(),
-        "user2": hashlib.sha256("ijfugroup2".encode()).hexdigest(),
-        "user3": hashlib.sha256("ijfugroup3".encode()).hexdigest(),
-        "user4": hashlib.sha256("ijfugroup4".encode()).hexdigest()
+        "demo1": hashlib.sha256("123456".encode()).hexdigest(),
+        "demo2": hashlib.sha256("123456".encode()).hexdigest(),
+        "demo3": hashlib.sha256("123456".encode()).hexdigest()
+        
     }
     
     st.title("Login Convert PDF FP To Excel")
