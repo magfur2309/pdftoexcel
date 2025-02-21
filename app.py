@@ -21,6 +21,35 @@ def find_invoice_date(pdf_file):
                     return f"{day.zfill(2)}/{month_map[month]}/{year}"
     return "Tidak ditemukan"
 
+def count_items_in_pdf(pdf_file):
+    item_count = 0
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                matches = re.findall(r'^\d+', text, re.MULTILINE)
+                item_count += len(matches)
+    return item_count
+
+def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
+    data = []
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                matches = re.findall(r'([^\n]+)\s+(\d+)\s+([\d,.]+)', text)
+                for match in matches:
+                    nama_barang, qty, harga = match
+                    qty = int(qty)
+                    harga = float(harga.replace(',', ''))
+                    total = qty * harga
+                    dpp = total / 1.11
+                    ppn = total - dpp
+                    data.append(["Tidak ditemukan", "Tidak ditemukan", "Tidak ditemukan", tanggal_faktur, nama_barang, qty, "Unit", harga, 0, total, dpp, ppn])
+                    if len(data) >= expected_item_count:
+                        break
+    return data
+
 def login_page():
     users = {
         "demo1": hashlib.sha256("123456".encode()).hexdigest(),
