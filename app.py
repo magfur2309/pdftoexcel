@@ -4,6 +4,48 @@ import pdfplumber
 import io
 import re
 import hashlib
+import datetime
+# ... (your existing code)
+
+def login_page():
+    # ... (your existing code)
+
+def main_app():
+    st.title("Convert Faktur Pajak PDF To Excel")
+
+    # Check if the user is logged in
+    if "logged_in" not in st.session_state or not st.session_state["logged_in"]:
+        st.error("Anda harus login terlebih dahulu.")
+        return
+
+    # Get the current date
+    today = datetime.date.today()
+
+    # Check if the user has exceeded the upload limit for today
+    if "upload_count" not in st.session_state:
+        st.session_state["upload_count"] = 0
+    elif st.session_state["upload_count"] >= 15 and today == st.session_state["last_upload_date"]:
+        st.error("Anda telah mencapai batas upload maksimal untuk hari ini (15 file).")
+        return
+
+    # ... (your existing code)
+
+    if uploaded_files:
+        # Update the upload count and last upload date
+        st.session_state["upload_count"] += len(uploaded_files)
+        st.session_state["last_upload_date"] = today
+
+        # ... (your existing code)
+
+# ... (your existing code)
+
+if __name__ == "__main__":
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+    if st.session_state["logged_in"]:
+        main_app()
+    else:
+        login_page()
 
 def find_invoice_date(pdf_file):
     month_map = {
