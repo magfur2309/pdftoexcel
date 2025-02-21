@@ -4,6 +4,7 @@ import pdfplumber
 import io
 import re
 import hashlib
+import base64
 from datetime import date
 
 def find_invoice_date(pdf_file):
@@ -37,8 +38,7 @@ def extract_data_from_pdf(pdf_file, tanggal_faktur, expected_item_count):
         for page in pdf.pages:
             text = page.extract_text()
             if text:
-                matches = re.findall(r'([^
-]+)\s+(\d+)\s+([\d,.]+)', text)
+                matches = re.findall(r'([^\n]+)\s+(\d+)\s+([\d,.]+)', text)
                 for match in matches:
                     nama_barang, qty, harga = match
                     qty = int(qty)
@@ -113,6 +113,9 @@ def main_app():
             df.index = df.index + 1  
             st.write("### Pratinjau Data yang Diekstrak")
             st.dataframe(df)
+            csv_data = df.to_csv(index=False)
+            b64 = base64.b64encode(csv_data.encode()).decode()
+            st.download_button(label="📥 Unduh CSV", data=b64, file_name="Faktur_Pajak.csv", mime="text/csv")
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
