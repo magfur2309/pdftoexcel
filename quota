@@ -51,26 +51,29 @@ def login_page():
 
 # Fungsi untuk Cek Kuota Upload
 def check_upload_quota(username):
-    today = datetime.now().date().isoformat()
-    
-    # Ambil jumlah file yang sudah diunggah hari ini
+    today = datetime.now().date()
     response = supabase.table("upload_logs").select("id").eq("username", username).eq("date", today).execute()
-    uploaded_count = len(response.data) if response.data else 0
+    user_quota = supabase.table("users").select("upload_quota").eq("username", username).execute()
 
-    # Ambil kuota upload user
-    user_quota_response = supabase.table("users").select("upload_quota").eq("username", username).execute()
-    max_quota = user_quota_response.data[0]["upload_quota"] if user_quota_response.data else 5
+    if not user_quota.data:
+        return False  # Jika user tidak ditemukan, batasi upload
 
-    return uploaded_count, max_quota
+    max_quota = user_quota.data[0]["upload_quota"] if user_quota.data else 5
+    if response.data and len(response.data) >= max_quota:
+        return False
+    return True
+
+
 
 # Fungsi untuk Menyimpan Log Upload
-def log_upload(username, file_count=1):
+def log_upload(username):
     today = date.today().isoformat()
-    for _ in range(file_count):
-        supabase.table("upload_logs").insert({
-            "username": username,
-            "date": today
-        }).execute()
+    supabase.table("upload_logs").insert({
+        "username": username,
+        "date": today
+    }).execute()
+
+
 
 # Fungsi Admin Panel
 def admin_panel():
@@ -126,17 +129,19 @@ def main_app():
     st.title("Konversi Faktur Pajak PDF To Excel")
 
     if st.session_state["role"] == "user":
-        today_uploads, max_quota = check_upload_quota(st.session_state["username"])
+        today_uploads = check_upload_quota(st.session_state["username"])
+        max_quota = st.session_state["upload_quota"]
 
         if today_uploads >= max_quota:
             st.warning(f"Anda telah mencapai batas upload {max_quota} PDF per hari.")
-            return  # Pastikan return ini ada di dalam fungsi
+            return
 
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF)", type=["pdf"], accept_multiple_files=True)
 
     if uploaded_files:
         file_count = len(uploaded_files)
-        today_uploads, max_quota = check_upload_quota(st.session_state["username"])
+        today_uploads = check_upload_quota(st.session_state["username"])
+        max_quota = st.session_state["upload_quota"]
 
         if today_uploads + file_count > max_quota:
             st.warning(f"Anda hanya dapat mengunggah {max_quota - today_uploads} file lagi hari ini.")
@@ -171,3 +176,25 @@ def main_app():
             )
         else:
             st.error("Gagal mengekstrak data!")
+
+
+# Menjalankan Aplikasi
+if __name__ == "__main__":
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+
+    if not st.session_state["logged_in"]:
+        login_page()
+    else:
+        st.sidebar.write(f"**User: {st.session_state['username']}**")
+        if st.sidebar.button("Logout"):
+            logout()
+
+        if st.session_state["role"] == "admin":
+            st.sidebar.button("Kelola Pengguna", on_click=lambda: st.session_state.update({"admin_panel": True}))
+            if st.session_state.get("admin_panel"):
+                admin_panel()
+            else:
+                main_app()
+        else:
+            main_app()
