@@ -36,18 +36,22 @@ def login_page():
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
-    if st.button("Login"):
-        response = supabase.table("users").select("*").eq("username", username).execute()
-        user_data = response.data
+    # Menekan Enter juga bisa login
+    login_pressed = st.button("Login") or (username and password and st.session_state.get("enter_pressed", False))
 
-        if user_data and verify_password(password, user_data[0]["password"]):
+    if login_pressed:
+        user = authenticate_user(username, password)
+        if user:
             st.session_state["logged_in"] = True
-            st.session_state["username"] = username
-            st.session_state["role"] = user_data[0]["role"]
-            st.session_state["upload_quota"] = user_data[0]["upload_quota"]
+            st.session_state["username"] = user["username"]
+            st.session_state["role"] = user["role"]
             st.rerun()
         else:
-            st.error("Username atau password salah!")
+            st.error("Username atau password salah")
+
+    # Reset enter_pressed agar tidak terus-menerus login otomatis
+    st.session_state["enter_pressed"] = False
+
 
 
 # Fungsi untuk Cek Kuota Upload
