@@ -8,8 +8,8 @@ from supabase import create_client, Client
 import datetime
 
 # Inisialisasi Supabase
-SUPABASE_URL = "https://your-project.supabase.co"  # Ganti dengan URL Supabase Anda
-SUPABASE_KEY = "your-anon-key"  # Ganti dengan API Key Supabase Anda
+SUPABASE_URL = "https://ukajqoitsfsolloyewsj.supabase.co"  # Ganti dengan URL Supabase Anda
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrYWpxb2l0c2Zzb2xsb3lld3NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMjUyMDEsImV4cCI6MjA1NTYwMTIwMX0.vllN8bcBG-wpjA9g7jjTMQ6_Xf-OgJdeIOu3by_cGP0"  # Ganti dengan API Key Supabase Anda
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
