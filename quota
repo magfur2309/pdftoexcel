@@ -130,10 +130,7 @@ def main_app():
 
 if today_uploads >= max_quota:
     st.warning(f"Anda telah mencapai batas upload {max_quota} PDF per hari.")
-    return
-
-
-    uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF)", type=["pdf"], accept_multiple_files=True)
+      uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF)", type=["pdf"], accept_multiple_files=True)
 
     if uploaded_files:
         file_count = len(uploaded_files)
