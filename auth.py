@@ -4,7 +4,8 @@ import pandas as pd
 import pdfplumber
 import io
 import re
-from login import login_page
+from auth import login_page
+
 
 def main_app():
     if "logged_in" not in st.session_state:
