@@ -128,14 +128,15 @@ def main_app():
     if st.session_state["role"] == "user":
         today_uploads, max_quota = check_upload_quota(st.session_state["username"])
 
-if today_uploads >= max_quota:
-    st.warning(f"Anda telah mencapai batas upload {max_quota} PDF per hari.")
-      uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF)", type=["pdf"], accept_multiple_files=True)
+        if today_uploads >= max_quota:
+            st.warning(f"Anda telah mencapai batas upload {max_quota} PDF per hari.")
+            return  # Pastikan return ini ada di dalam fungsi
+
+    uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF)", type=["pdf"], accept_multiple_files=True)
 
     if uploaded_files:
         file_count = len(uploaded_files)
-        today_uploads = check_upload_quota(st.session_state["username"])
-        max_quota = st.session_state["upload_quota"]
+        today_uploads, max_quota = check_upload_quota(st.session_state["username"])
 
         if today_uploads + file_count > max_quota:
             st.warning(f"Anda hanya dapat mengunggah {max_quota - today_uploads} file lagi hari ini.")
@@ -143,7 +144,7 @@ if today_uploads >= max_quota:
 
         all_data = []
         for uploaded_file in uploaded_files:
-            log_upload(st.session_state["username"], file_count)
+            log_upload(st.session_state["username"], file_count)  # Simpan log upload
 
             # Simulasi ekstraksi data
             extracted_data = [["123456789", "Nama Penjual", "Nama Pembeli", "01/01/2025", "Barang A", 2, "pcs", 10000, 0, 20000, 18000, 2000]]
@@ -170,25 +171,3 @@ if today_uploads >= max_quota:
             )
         else:
             st.error("Gagal mengekstrak data!")
-
-
-# Menjalankan Aplikasi
-if __name__ == "__main__":
-    if "logged_in" not in st.session_state:
-        st.session_state["logged_in"] = False
-
-    if not st.session_state["logged_in"]:
-        login_page()
-    else:
-        st.sidebar.write(f"**User: {st.session_state['username']}**")
-        if st.sidebar.button("Logout"):
-            logout()
-
-        if st.session_state["role"] == "admin":
-            st.sidebar.button("Kelola Pengguna", on_click=lambda: st.session_state.update({"admin_panel": True}))
-            if st.session_state.get("admin_panel"):
-                admin_panel()
-            else:
-                main_app()
-        else:
-            main_app()
