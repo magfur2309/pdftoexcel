@@ -66,10 +66,13 @@ def check_upload_quota(username):
 
 
 # Fungsi untuk Menyimpan Log Upload
-def log_upload(username, file_count):
-    today = datetime.date.today().isoformat()
-    for _ in range(file_count):
-        supabase.table("uploads").insert({"username": username, "date": today}).execute()
+def log_upload(username):
+    today = date.today().isoformat()
+    supabase.table("upload_logs").insert({
+        "username": username,
+        "date": today
+    }).execute()
+
 
 
 # Fungsi Admin Panel
