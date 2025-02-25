@@ -5,13 +5,8 @@ import bcrypt
 import os
 from dotenv import load_dotenv
 
-# Ambil secrets dengan aman
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-
-# Debugging untuk cek apakah nilai terbaca
-st.write("SUPABASE_URL:", SUPABASE_URL)
-st.write("SUPABASE_KEY:", SUPABASE_KEY)
+st.write("SUPABASE_URL:", st.secrets.get("SUPABASE_URL", "Tidak ditemukan"))
+st.write("SUPABASE_KEY:", st.secrets.get("SUPABASE_KEY", "Tidak ditemukan"))
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def hash_password(password):
