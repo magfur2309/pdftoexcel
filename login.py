@@ -1,40 +1,41 @@
+# login.py - Menangani autentikasi dengan Supabase
 import streamlit as st
-import hashlib
+from supabase import create_client
+import bcrypt
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
-def check_login():
-    st.title("Login")
+def verify_password(password, hashed_password):
+    return bcrypt.checkpw(password.encode(), hashed_password.encode())
+
+def authenticate_user(username, password):
+    response = supabase.table("users").select("id, username, password, role").eq("username", username).execute()
+    if response.data:
+        user = response.data[0]
+        if verify_password(password, user["password"]):
+            return user
+    return None
+
+def login_page():
+    st.title("Login Konversi Faktur Pajak")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     
-    if st.session_state.get("login_pressed") or st.text_input("Press Enter to Login", key="hidden_input", type="default"): 
-        st.session_state["login_pressed"] = True
-    
-    if st.session_state.get("login_pressed"):
-        user_data = {
-            "admin": hash_password("password123"),
-            "user": hash_password("userpass")
-        }
-        
-        if username in user_data and user_data[username] == hash_password(password):
-            st.session_state["authenticated"] = True
-            st.success("Login berhasil! Akses diberikan.")
-            st.experimental_rerun()
+    if st.button("Login"):
+        user = authenticate_user(username, password)
+        if user:
+            st.session_state["logged_in"] = True
+            st.session_state["username"] = user["username"]
+            st.session_state["role"] = user["role"]
+            st.rerun()
         else:
             st.error("Username atau password salah")
-            st.session_state["login_pressed"] = False
-
-def main():
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
-    
-    if not st.session_state["authenticated"]:
-        check_login()
-    else:
-        st.success("Anda sudah login. Silakan buka aplikasi utama.")
-        st.write("[Buka Aplikasi Utama](app.py)")
-
-if __name__ == "__main__":
-    main()
