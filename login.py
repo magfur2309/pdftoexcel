@@ -13,7 +13,6 @@ SUPABASE_URL = "https://ukajqoitsfsolloyewsj.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrYWpxb2l0c2Zzb2xsb3lld3NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMjUyMDEsImV4cCI6MjA1NTYwMTIwMX0.vllN8bcBG-wpjA9g7jjTMQ6_Xf-OgJdeIOu3by_cGP0"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-
 # Fungsi Hash Password
 def hash_password(password):
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -58,9 +57,10 @@ def check_upload_quota(username):
 
 
 # Fungsi untuk Menyimpan Log Upload
-def log_upload(username):
+def log_upload(username, file_count):
     today = datetime.date.today().isoformat()
-    supabase.table("uploads").insert({"username": username, "date": today}).execute()
+    for _ in range(file_count):
+        supabase.table("uploads").insert({"username": username, "date": today}).execute()
 
 
 # Fungsi Admin Panel
@@ -71,7 +71,7 @@ def admin_panel():
         new_username = st.text_input("Username baru")
         new_password = st.text_input("Password baru", type="password")
         role = st.selectbox("Role", ["user", "admin"])
-        upload_quota = st.number_input("Kuota Upload", min_value=1, value=1)
+        upload_quota = st.number_input("Kuota Upload (PDF/hari)", min_value=1, value=5)
         submit = st.form_submit_button("Tambah User")
 
         if submit:
@@ -118,18 +118,28 @@ def main_app():
 
     if st.session_state["role"] == "user":
         today_uploads = check_upload_quota(st.session_state["username"])
-        if today_uploads >= st.session_state["upload_quota"]:
-            st.warning("Anda telah mencapai batas upload untuk hari ini.")
+        max_quota = st.session_state["upload_quota"]
+
+        if today_uploads >= max_quota:
+            st.warning(f"Anda telah mencapai batas upload {max_quota} PDF per hari.")
             return
 
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF)", type=["pdf"], accept_multiple_files=True)
 
     if uploaded_files:
+        file_count = len(uploaded_files)
+        today_uploads = check_upload_quota(st.session_state["username"])
+        max_quota = st.session_state["upload_quota"]
+
+        if today_uploads + file_count > max_quota:
+            st.warning(f"Anda hanya dapat mengunggah {max_quota - today_uploads} file lagi hari ini.")
+            return
+
         all_data = []
         for uploaded_file in uploaded_files:
-            log_upload(st.session_state["username"])  # Simpan log upload
+            log_upload(st.session_state["username"], file_count)  # Simpan log upload
 
-            # Simulasi ekstraksi data (tidak ada perubahan pada fungsi utama)
+            # Simulasi ekstraksi data
             extracted_data = [["123456789", "Nama Penjual", "Nama Pembeli", "01/01/2025", "Barang A", 2, "pcs", 10000, 0, 20000, 18000, 2000]]
             all_data.extend(extracted_data)
 
