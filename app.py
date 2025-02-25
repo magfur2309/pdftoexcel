@@ -7,6 +7,7 @@ from supabase import create_client, Client
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
+from datetime import datetime, date
 
 # Load environment variables
 load_dotenv()
