@@ -1,53 +1,56 @@
-# auth.py - Menangani autentikasi dengan Supabase
+# main.py
 import streamlit as st
-from supabase import create_client
-import bcrypt
+import pandas as pd
+import pdfplumber
+import io
+import re
+from login import login_page
 
-# Mengambil credential dari secrets
-SUPABASE_URL = st.secrets.get("SUPABASE_URL", None)
-SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", None)
-
-# Periksa apakah URL dan KEY tersedia sebelum membuat client
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-else:
-    st.error("Gagal menghubungkan ke Supabase: Periksa konfigurasi secrets!")
-
-def hash_password(password):
-    """Mengenkripsi password menggunakan bcrypt."""
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-
-def verify_password(password, hashed_password):
-    """Memverifikasi password yang dimasukkan dengan hash yang tersimpan."""
-    return bcrypt.checkpw(password.encode(), hashed_password.encode())
-
-def authenticate_user(username, password):
-    """Mengecek apakah username dan password cocok dengan database."""
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        return None  # Hindari error jika Supabase tidak dikonfigurasi
+def main_app():
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
     
-    response = supabase.table("users").select("id, username, password, role").eq("username", username).execute()
+    if not st.session_state["logged_in"]:
+        login_page()
+        return
     
-    if response.data:
-        user = response.data[0]
-        if verify_password(password, user["password"]):
-            return user  # Return data user jika berhasil login
-    return None
-
-def login_page():
-    """Menampilkan halaman login."""
-    st.title("Login Konversi Faktur Pajak")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    st.title("Konversi Faktur Pajak PDF ke Excel")
     
-    if st.button("Login"):
-        user = authenticate_user(username, password)
-        if user:
-            st.session_state["logged_in"] = True
-            st.session_state["username"] = user["username"]
-            st.session_state["role"] = user["role"]
-            st.success(f"Selamat datang, {user['username']}!")
-            st.rerun()  # Refresh halaman setelah login
+    if st.button("Logout"):
+        st.session_state["logged_in"] = False
+        st.experimental_rerun()
+    
+    uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
+    
+    if uploaded_files:
+        all_data = []
+        for uploaded_file in uploaded_files:
+            tanggal_faktur = find_invoice_date(uploaded_file)
+            detected_item_count = count_items_in_pdf(uploaded_file)
+            extracted_data = extract_data_from_pdf(uploaded_file, tanggal_faktur, detected_item_count)
+            extracted_item_count = len(extracted_data)
+            
+            if detected_item_count != extracted_item_count and detected_item_count != 0:
+                st.warning(f"Jumlah item tidak cocok untuk {uploaded_file.name}: Ditemukan {detected_item_count}, diekstrak {extracted_item_count}")
+            
+            if extracted_data:
+                all_data.extend(extracted_data)
+        
+        if all_data:
+            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Nama Pembeli", "Nama Barang", "Harga", "Unit", "QTY", "Total", "Potongan Harga", "DPP", "PPN", "Tanggal Faktur"])
+            df.index = df.index + 1  
+            
+            st.write("### Pratinjau Data yang Diekstrak")
+            st.dataframe(df)
+            
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
+            output.seek(0)
+            
+            st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
-            st.error("Username atau password salah")
+            st.error("Gagal mengekstrak data. Pastikan format faktur sesuai.")
 
+if __name__ == "__main__":
+    main_app()
