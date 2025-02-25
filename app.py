@@ -8,8 +8,8 @@ from datetime import datetime
 from supabase import create_client
 
 # Konfigurasi Supabase
-SUPABASE_URL = "https://your-supabase-url.supabase.co"
-SUPABASE_KEY = "your-supabase-anon-key"
+SUPABASE_URL = "https://ukajqoitsfsolloyewsj.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrYWpxb2l0c2Zzb2xsb3lld3NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMjUyMDEsImV4cCI6MjA1NTYwMTIwMX0.vllN8bcBG-wpjA9g7jjTMQ6_Xf-OgJdeIOu3by_cGP0"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def get_user(username):
