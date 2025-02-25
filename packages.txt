@@ -1,8 +1,1 @@
-tesseract-ocr
-poppler-utils
-streamlit
-pandas
-pdfplumber
-supabase
-xlsxwriter
 
