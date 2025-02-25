@@ -1,15 +1,7 @@
-pdfplumber
-pandas
-streamlit
-pytesseract
-pdf2image
-pillow
-xlsxwriter
 streamlit
 pandas
 pdfplumber
 supabase
-bcrypt
-python-dotenv
 xlsxwriter
-
+python-dotenv
+bcrypt
