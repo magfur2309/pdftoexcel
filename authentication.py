@@ -4,7 +4,7 @@ import pandas as pd
 import pdfplumber
 import io
 import re
-from auth import login_page
+from authentication import login_page
 
 
 def main_app():
