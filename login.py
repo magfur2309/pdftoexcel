@@ -8,9 +8,9 @@ from supabase import create_client, Client
 import datetime
 
 # Inisialisasi Supabase
-SUPABASE_URL = "https://ukajqoitsfsolloyewsj.supabase.co"  # Ganti dengan URL Supabase Anda
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrYWpxb2l0c2Zzb2xsb3lld3NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMjUyMDEsImV4cCI6MjA1NTYwMTIwMX0.vllN8bcBG-wpjA9g7jjTMQ6_Xf-OgJdeIOu3by_cGP0"  # Ganti dengan API Key Supabase Anda
 
+SUPABASE_URL = "https://ukajqoitsfsolloyewsj.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrYWpxb2l0c2Zzb2xsb3lld3NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMjUyMDEsImV4cCI6MjA1NTYwMTIwMX0.vllN8bcBG-wpjA9g7jjTMQ6_Xf-OgJdeIOu3by_cGP0"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
@@ -36,22 +36,18 @@ def login_page():
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
-    # Menekan Enter juga bisa login
-    login_pressed = st.button("Login") or (username and password and st.session_state.get("enter_pressed", False))
+    if st.button("Login"):
+        response = supabase.table("users").select("*").eq("username", username).execute()
+        user_data = response.data
 
-    if login_pressed:
-        user = authenticate_user(username, password)
-        if user:
+        if user_data and verify_password(password, user_data[0]["password"]):
             st.session_state["logged_in"] = True
-            st.session_state["username"] = user["username"]
-            st.session_state["role"] = user["role"]
+            st.session_state["username"] = username
+            st.session_state["role"] = user_data[0]["role"]
+            st.session_state["upload_quota"] = user_data[0]["upload_quota"]
             st.rerun()
         else:
-            st.error("Username atau password salah")
-
-    # Reset enter_pressed agar tidak terus-menerus login otomatis
-    st.session_state["enter_pressed"] = False
-
+            st.error("Username atau password salah!")
 
 
 # Fungsi untuk Cek Kuota Upload
