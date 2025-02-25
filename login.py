@@ -24,6 +24,12 @@ def verify_password(password, hashed_password):
     return bcrypt.checkpw(password.encode(), hashed_password.encode())
 
 
+# Fungsi Logout
+def logout():
+    st.session_state.clear()
+    st.rerun()
+
+
 # Fungsi Login
 def login_page():
     st.title("Login Konversi Faktur Pajak")
@@ -158,6 +164,10 @@ if __name__ == "__main__":
     if not st.session_state["logged_in"]:
         login_page()
     else:
+        st.sidebar.write(f"**User: {st.session_state['username']}**")
+        if st.sidebar.button("Logout"):
+            logout()
+
         if st.session_state["role"] == "admin":
             st.sidebar.button("Kelola Pengguna", on_click=lambda: st.session_state.update({"admin_panel": True}))
             if st.session_state.get("admin_panel"):
