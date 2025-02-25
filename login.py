@@ -51,29 +51,26 @@ def login_page():
 
 # Fungsi untuk Cek Kuota Upload
 def check_upload_quota(username):
-    today = datetime.now().date()
+    today = datetime.now().date().isoformat()
+    
+    # Ambil jumlah file yang sudah diunggah hari ini
     response = supabase.table("upload_logs").select("id").eq("username", username).eq("date", today).execute()
-    user_quota = supabase.table("users").select("upload_quota").eq("username", username).execute()
+    uploaded_count = len(response.data) if response.data else 0
 
-    if not user_quota.data:
-        return False  # Jika user tidak ditemukan, batasi upload
+    # Ambil kuota upload user
+    user_quota_response = supabase.table("users").select("upload_quota").eq("username", username).execute()
+    max_quota = user_quota_response.data[0]["upload_quota"] if user_quota_response.data else 5
 
-    max_quota = user_quota.data[0]["upload_quota"] if user_quota.data else 5
-    if response.data and len(response.data) >= max_quota:
-        return False
-    return True
-
-
+    return uploaded_count, max_quota
 
 # Fungsi untuk Menyimpan Log Upload
-def log_upload(username):
+def log_upload(username, file_count=1):
     today = date.today().isoformat()
-    supabase.table("upload_logs").insert({
-        "username": username,
-        "date": today
-    }).execute()
-
-
+    for _ in range(file_count):
+        supabase.table("upload_logs").insert({
+            "username": username,
+            "date": today
+        }).execute()
 
 # Fungsi Admin Panel
 def admin_panel():
@@ -129,12 +126,12 @@ def main_app():
     st.title("Konversi Faktur Pajak PDF To Excel")
 
     if st.session_state["role"] == "user":
-        today_uploads = check_upload_quota(st.session_state["username"])
-        max_quota = st.session_state["upload_quota"]
+        today_uploads, max_quota = check_upload_quota(st.session_state["username"])
 
-        if today_uploads >= max_quota:
-            st.warning(f"Anda telah mencapai batas upload {max_quota} PDF per hari.")
-            return
+if today_uploads >= max_quota:
+    st.warning(f"Anda telah mencapai batas upload {max_quota} PDF per hari.")
+    return
+
 
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF)", type=["pdf"], accept_multiple_files=True)
 
@@ -149,7 +146,7 @@ def main_app():
 
         all_data = []
         for uploaded_file in uploaded_files:
-            log_upload(st.session_state["username"], file_count)  # Simpan log upload
+            log_upload(st.session_state["username"], file_count)
 
             # Simulasi ekstraksi data
             extracted_data = [["123456789", "Nama Penjual", "Nama Pembeli", "01/01/2025", "Barang A", 2, "pcs", 10000, 0, 20000, 18000, 2000]]
