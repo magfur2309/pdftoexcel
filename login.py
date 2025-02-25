@@ -51,9 +51,18 @@ def login_page():
 
 # Fungsi untuk Cek Kuota Upload
 def check_upload_quota(username):
-    today = datetime.date.today().isoformat()
-    response = supabase.table("uploads").select("*").eq("username", username).eq("date", today).execute()
-    return len(response.data)  # Mengembalikan jumlah upload hari ini
+    today = datetime.now().date()
+    response = supabase.table("upload_logs").select("id").eq("username", username).eq("date", today).execute()
+    user_quota = supabase.table("users").select("upload_quota").eq("username", username).execute()
+
+    if not user_quota.data:
+        return False  # Jika user tidak ditemukan, batasi upload
+
+    max_quota = user_quota.data[0]["upload_quota"] if user_quota.data else 5
+    if response.data and len(response.data) >= max_quota:
+        return False
+    return True
+
 
 
 # Fungsi untuk Menyimpan Log Upload
