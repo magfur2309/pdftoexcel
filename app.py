@@ -2,99 +2,73 @@ import streamlit as st
 import pandas as pd
 import pdfplumber
 import io
-import re
+import supabase
 import hashlib
-from datetime import datetime, date
-from supabase import create_client
+import datetime
 
-# Konfigurasi Supabase
-SUPABASE_URL = "YOUR_SUPABASE_URL"
-SUPABASE_KEY = "YOUR_SUPABASE_KEY"
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Inisialisasi Supabase
+SUPABASE_URL = "https://ukajqoitsfsolloyewsj.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrYWpxb2l0c2Zzb2xsb3lld3NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMjUyMDEsImV4cCI6MjA1NTYwMTIwMX0.vllN8bcBG-wpjA9g7jjTMQ6_Xf-OgJdeIOu3by_cGP0"
+sb = supabase.create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def find_invoice_date(pdf_file):
-    month_map = {"Januari": "01", "Februari": "02", "Maret": "03", "April": "04", "Mei": "05", "Juni": "06", 
-                 "Juli": "07", "Agustus": "08", "September": "09", "Oktober": "10", "November": "11", "Desember": "12"}
-    with pdfplumber.open(pdf_file) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                date_match = re.search(r'(\d{1,2})\s*(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s*(\d{4})', text, re.IGNORECASE)
-                if date_match:
-                    day, month, year = date_match.groups()
-                    return f"{day.zfill(2)}/{month_map[month]}/{year}"
-    return "Tidak ditemukan"
+# Fungsi hashing password
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
-def login_page():
-    st.title("Login Convert PDF FP To Excel")
+# Cek login session
+if "user" not in st.session_state:
+    st.session_state.user = None
 
-    with st.form("login_form"):
-        username = st.text_input("Username", placeholder="Masukkan username Anda")
-        password = st.text_input("Password", type="password", placeholder="Masukkan password Anda")
-        submit_button = st.form_submit_button("Login")
-
-    if submit_button or st.session_state.get("enter_pressed", False):
-        hashed_password = hashlib.sha256(password.encode()).hexdigest()
-        user_query = supabase.table("users").select("username, password, expires_at, role, last_upload").eq("username", username).execute()
-        if user_query.data:
-            user = user_query.data[0]
-            if user["password"] == hashed_password:
-                if user["expires_at"] and date.today() > datetime.strptime(user["expires_at"], "%Y-%m-%d").date():
-                    st.error("Akun Anda telah kedaluwarsa")
-                else:
-                    st.session_state["logged_in"] = True
-                    st.session_state["username"] = username
-                    st.session_state["role"] = user["role"]
-                    st.session_state["last_upload"] = user["last_upload"]
-                    st.success("Login berhasil! Selamat Datang Member ijfugroup")
-                    st.rerun()
-            else:
-                st.error("Username atau password salah")
+# Tampilan login
+if st.session_state.user is None:
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        response = sb.table("users").select("username, password, role").eq("username", username).execute()
+        user_data = response.data
+        if user_data and user_data[0]["password"] == hash_password(password):
+            st.session_state.user = {"username": username, "role": user_data[0]["role"]}
+            st.experimental_rerun()
         else:
-            st.error("Username tidak ditemukan")
-
-def main_app():
-    st.title("Convert Faktur Pajak PDF To Excel")
-    username = st.session_state["username"]
-    role = st.session_state["role"]
-    last_upload = st.session_state.get("last_upload")
-
-    # Batasi upload 1 file per hari untuk user biasa
-    if role == "user" and last_upload and last_upload == str(date.today()):
-        st.warning("Anda hanya bisa mengupload 1 file per hari")
-        return
-    
-    uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF, bisa lebih dari satu)", type=["pdf"], accept_multiple_files=True)
-    
-    if uploaded_files:
-        all_data = []
-        for uploaded_file in uploaded_files:
-            tanggal_faktur = find_invoice_date(uploaded_file)
-            extracted_data = [["Contoh Data", "12345", tanggal_faktur]]  # Placeholder
-            all_data.extend(extracted_data)
-        
-        if all_data:
-            df = pd.DataFrame(all_data, columns=["No FP", "Nama Penjual", "Tanggal Faktur"])
-            st.write("### Pratinjau Data yang Diekstrak")
-            st.dataframe(df)
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=True, sheet_name='Faktur Pajak')
-            output.seek(0)
-            st.download_button(label="\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        
-        # Update tanggal upload terakhir user di database
-        supabase.table("users").update({"last_upload": str(date.today())}).eq("username", username).execute()
-
-def logout():
-    st.session_state.clear()
-    st.rerun()
-
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-
-if not st.session_state["logged_in"]:
-    login_page()
+            st.error("Username atau password salah")
 else:
-    st.sidebar.button("Logout", on_click=logout)
-    main_app()
+    st.title("Konversi PDF ke Excel")
+    st.write(f"Login sebagai: {st.session_state.user['username']} ({st.session_state.user['role']})")
+    
+    # Ambil data upload user hari ini
+    today = datetime.date.today().isoformat()
+    user_uploads = sb.table("uploads").select("id").eq("username", st.session_state.user["username"]).eq("date", today).execute().data
+    
+    # Cek batasan upload untuk non-admin
+    if st.session_state.user["role"] != "admin" and user_uploads:
+        st.warning("Anda hanya bisa mengunggah 1 file per hari.")
+    else:
+        uploaded_files = st.file_uploader("Upload file PDF", type=["pdf"], accept_multiple_files=(st.session_state.user["role"] == "admin"))
+        
+        if uploaded_files:
+            all_data = []
+            for uploaded_file in uploaded_files:
+                with pdfplumber.open(uploaded_file) as pdf:
+                    text = "\n".join([page.extract_text() for page in pdf.pages if page.extract_text()])
+                    all_data.append({"Filename": uploaded_file.name, "Content": text})
+                
+                # Catat upload ke database
+                sb.table("uploads").insert({"username": st.session_state.user["username"], "date": today, "filename": uploaded_file.name}).execute()
+            
+            df = pd.DataFrame(all_data)
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+                df.to_excel(writer, index=False, sheet_name="Data PDF")
+            st.download_button(label="Download Excel", data=output.getvalue(), file_name="output.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    
+    # Admin dapat melihat daftar user dan aktivitas upload
+    if st.session_state.user["role"] == "admin":
+        st.subheader("Manajemen User dan Upload")
+        users_data = sb.table("users").select("username, role").execute().data
+        st.write(pd.DataFrame(users_data))
+        uploads_data = sb.table("uploads").select("username, date, filename").execute().data
+        st.write(pd.DataFrame(uploads_data))
+    
+    if st.button("Logout"):
+        st.session_state.user = None
+        st.experimental_rerun()
