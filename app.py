@@ -3,6 +3,15 @@ import pandas as pd
 import pdfplumber
 import io
 import re
+from supabase import create_client
+import hashlib
+import datetime
+
+# Supabase Credentials
+SUPABASE_URL = "https://ukajqoitsfsolloyewsj.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrYWpxb2l0c2Zzb2xsb3lld3NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMjUyMDEsImV4cCI6MjA1NTYwMTIwMX0.vllN8bcBG-wpjA9g7jjTMQ6_Xf-OgJdeIOu3by_cGP0"
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def find_invoice_date(pdf_file):
     """Mencari tanggal faktur dalam PDF, mulai dari halaman pertama."""
