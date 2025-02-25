@@ -4,8 +4,8 @@ import pandas as pd
 import pdfplumber
 import io
 import re
-from authentication import login_page
-
+from supabase import create_client
+import bcrypt
 
 def main_app():
     if "logged_in" not in st.session_state:
