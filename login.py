@@ -4,29 +4,30 @@ import pdfplumber
 import io
 import re
 import bcrypt
-import os
-from dotenv import load_dotenv
 from supabase import create_client, Client
 from datetime import datetime, date
 
-# Load environment variables
-load_dotenv()
-SUPABASE_URL = os.getenv("https://ukajqoitsfsolloyewsj.supabase.co")
-SUPABASE_KEY = os.getenv("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrYWpxb2l0c2Zzb2xsb3lld3NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMjUyMDEsImV4cCI6MjA1NTYwMTIwMX0.vllN8bcBG-wpjA9g7jjTMQ6_Xf-OgJdeIOu3by_cGP0")
+# Inisialisasi Supabase
+
+SUPABASE_URL = "https://ukajqoitsfsolloyewsj.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrYWpxb2l0c2Zzb2xsb3lld3NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMjUyMDEsImV4cCI6MjA1NTYwMTIwMX0.vllN8bcBG-wpjA9g7jjTMQ6_Xf-OgJdeIOu3by_cGP0"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Fungsi Hash Password
 def hash_password(password):
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
+
 # Fungsi Verifikasi Password
 def verify_password(password, hashed_password):
     return bcrypt.checkpw(password.encode(), hashed_password.encode())
+
 
 # Fungsi Logout
 def logout():
     st.session_state.clear()
     st.rerun()
+
 
 # Fungsi Login
 def login_page():
@@ -47,24 +48,32 @@ def login_page():
         else:
             st.error("Username atau password salah!")
 
-# Fungsi untuk Cek Sisa Kuota Upload
+
+# Fungsi untuk Cek Kuota Upload
 def check_upload_quota(username):
-    today = date.today().isoformat()
+    today = datetime.now().date()
     response = supabase.table("upload_logs").select("id").eq("username", username).eq("date", today).execute()
     user_quota = supabase.table("users").select("upload_quota").eq("username", username).execute()
 
     if not user_quota.data:
-        return 0
+        return False  # Jika user tidak ditemukan, batasi upload
 
-    max_quota = user_quota.data[0]["upload_quota"]
-    uploaded_today = len(response.data) if response.data else 0
+    max_quota = user_quota.data[0]["upload_quota"] if user_quota.data else 5
+    if response.data and len(response.data) >= max_quota:
+        return False
+    return True
 
-    return max_quota - uploaded_today
+
 
 # Fungsi untuk Menyimpan Log Upload
 def log_upload(username):
     today = date.today().isoformat()
-    supabase.table("upload_logs").insert({"username": username, "date": today}).execute()
+    supabase.table("upload_logs").insert({
+        "username": username,
+        "date": today
+    }).execute()
+
+
 
 # Fungsi Admin Panel
 def admin_panel():
@@ -79,11 +88,12 @@ def admin_panel():
 
         if submit:
             if new_username and new_password:
+                hashed_password = hash_password(new_password)
                 response = supabase.table("users").select("id").eq("username", new_username).execute()
+
                 if response.data:
                     st.error("Username sudah digunakan!")
                 else:
-                    hashed_password = hash_password(new_password)
                     supabase.table("users").insert({
                         "username": new_username,
                         "password": hashed_password,
@@ -113,29 +123,35 @@ def admin_panel():
             st.warning(f"User {user['username']} dihapus!")
             st.rerun()
 
+
 # Fungsi Utama Aplikasi
 def main_app():
     st.title("Konversi Faktur Pajak PDF To Excel")
 
-    remaining_quota = check_upload_quota(st.session_state["username"])
+    if st.session_state["role"] == "user":
+        today_uploads = check_upload_quota(st.session_state["username"])
+        max_quota = st.session_state["upload_quota"]
 
-    if st.session_state["role"] == "user" and remaining_quota <= 0:
-        st.warning(f"Anda telah mencapai batas upload PDF per hari.")
-        return
+        if today_uploads >= max_quota:
+            st.warning(f"Anda telah mencapai batas upload {max_quota} PDF per hari.")
+            return
 
     uploaded_files = st.file_uploader("Upload Faktur Pajak (PDF)", type=["pdf"], accept_multiple_files=True)
 
     if uploaded_files:
         file_count = len(uploaded_files)
+        today_uploads = check_upload_quota(st.session_state["username"])
+        max_quota = st.session_state["upload_quota"]
 
-        if file_count > remaining_quota:
-            st.warning(f"Anda hanya dapat mengunggah {remaining_quota} file lagi hari ini.")
+        if today_uploads + file_count > max_quota:
+            st.warning(f"Anda hanya dapat mengunggah {max_quota - today_uploads} file lagi hari ini.")
             return
 
         all_data = []
         for uploaded_file in uploaded_files:
-            log_upload(st.session_state["username"])
+            log_upload(st.session_state["username"], file_count)  # Simpan log upload
 
+            # Simulasi ekstraksi data
             extracted_data = [["123456789", "Nama Penjual", "Nama Pembeli", "01/01/2025", "Barang A", 2, "pcs", 10000, 0, 20000, 18000, 2000]]
             all_data.extend(extracted_data)
 
@@ -152,10 +168,17 @@ def main_app():
                 df.to_excel(writer, index=True, sheet_name="Faktur Pajak")
             output.seek(0)
 
-            st.download_button("\U0001F4E5 Unduh Excel", data=output, file_name="Faktur_Pajak.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.download_button(
+                label="\U0001F4E5 Unduh Excel",
+                data=output,
+                file_name="Faktur_Pajak.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
         else:
             st.error("Gagal mengekstrak data!")
 
+
+# Menjalankan Aplikasi
 if __name__ == "__main__":
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
@@ -166,7 +189,12 @@ if __name__ == "__main__":
         st.sidebar.write(f"**User: {st.session_state['username']}**")
         if st.sidebar.button("Logout"):
             logout()
+
         if st.session_state["role"] == "admin":
-            admin_panel()
+            st.sidebar.button("Kelola Pengguna", on_click=lambda: st.session_state.update({"admin_panel": True}))
+            if st.session_state.get("admin_panel"):
+                admin_panel()
+            else:
+                main_app()
         else:
             main_app()
